@@ -1,4 +1,4 @@
-import { kodaikanalPhotos, arapalayamPhotos, kochadaiPhotos } from './photos';
+import { kodaikanalPhotos, arapalayamPhotos, kochadaiPhotos } from './photos.js';
 
 const maps = q => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 

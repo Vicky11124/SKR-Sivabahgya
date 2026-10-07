@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 import { useSite } from '../site';
 import Page from '../components/Page';
 import PageHeader from '../components/PageHeader';
 import { Stars, StarInput } from '../components/Stars';
 import { venues } from '../data/venues';
-import { loadReviews, saveReviews, newId } from '../lib/reviews';
+import { fetchReviews, postReview } from '../lib/reviews';
 
 const MAX = 600;
 const venueName = id => venues.find(v => v.id === id)?.booking ?? '';
@@ -47,29 +47,32 @@ function ReviewForm({ onAdd }) {
   const [text, setText] = useState('');
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState('');
+  const [sending, setSending] = useState(false);
 
-  const submit = e => {
+  const submit = async e => {
     e.preventDefault();
     const next = {};
     if (!name.trim()) next.name = 'Please add your name.';
     if (!rating) next.rating = 'Please choose a rating.';
     if (text.trim().length < 10) next.text = 'A few more words, please (at least 10 characters).';
     setErrors(next);
-    if (Object.keys(next).length) {
+    if (Object.keys(next).length || sending) {
       setStatus('');
       return;
     }
 
-    const saved = onAdd({
-      id: newId(),
-      name: name.trim().slice(0, 60),
-      place,
-      rating,
-      text: text.trim().slice(0, MAX),
-      date: new Date().toISOString()
-    });
-    setName(''); setRating(0); setText('');
-    setStatus(saved ? 'Thank you — your review is now live.' : 'Thank you — your review is shown, but this browser could not save it.');
+    setSending(true);
+    setStatus('');
+    try {
+      const saved = await postReview({ name: name.trim(), place, rating, text: text.trim() });
+      onAdd(saved);
+      setName(''); setRating(0); setText('');
+      setStatus('Thank you — your review is now live.');
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -111,7 +114,9 @@ function ReviewForm({ onAdd }) {
 
       <div className="rform__foot">
         <span className="rform__count">{text.length} / {MAX}</span>
-        <button type="submit" className="btn-gold" data-magnetic><span>Post review</span></button>
+        <button type="submit" className="btn-gold" data-magnetic disabled={sending}>
+          <span>{sending ? 'Posting…' : 'Post review'}</span>
+        </button>
       </div>
       <p className="rform__status" role="status" aria-live="polite">{status}</p>
     </form>
@@ -121,7 +126,8 @@ function ReviewForm({ onAdd }) {
 export default function Reviews() {
   const ref = useRef(null);
   const { scrollToTarget } = useSite();
-  const [reviews, setReviews] = useState(loadReviews);
+  const [reviews, setReviews] = useState([]);
+  const [load, setLoad] = useState('loading'); // loading | ready | error
   const [filter, setFilter] = useState('all');
   const [fresh, setFresh] = useState(null); // id of the review just added
 
@@ -130,12 +136,18 @@ export default function Reviews() {
     [reviews, filter]
   );
 
+  useEffect(() => {
+    let live = true;
+    fetchReviews()
+      .then(list => { if (live) { setReviews(list); setLoad('ready'); } })
+      .catch(() => live && setLoad('error'));
+    return () => { live = false; };
+  }, []);
+
   const add = review => {
-    const next = [review, ...reviews];
-    setReviews(next);
+    setReviews(list => [review, ...list]);
     setFilter('all');
     setFresh(review.id);
-    return saveReviews(next);
   };
 
   useGSAP(() => {
@@ -186,7 +198,11 @@ export default function Reviews() {
             ))}
           </div>
 
-          {shown.length ? (
+          {load === 'loading' ? (
+            <p className="rlist__note" role="status">Loading reviews…</p>
+          ) : load === 'error' ? (
+            <p className="rlist__note" role="alert">Reviews could not be loaded right now. Please try again later.</p>
+          ) : shown.length ? (
             <ol className="rlist">
               {shown.map(r => (
                 <li className="review" key={r.id} data-review={r.id}>

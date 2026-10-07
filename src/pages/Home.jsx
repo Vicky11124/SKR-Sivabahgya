@@ -6,7 +6,6 @@ import Statement from '../components/Statement';
 import Motif from '../components/Motif';
 import Locations from '../components/Locations';
 import Invite from '../components/Invite';
-import Marquee from '../components/Marquee';
 import Reserve from '../components/Reserve';
 
 export default function Home({ introPending, onIntroDone }) {
@@ -22,7 +21,6 @@ export default function Home({ introPending, onIntroDone }) {
         <Motif />
         <Locations />
         <Invite />
-        <Marquee />
         <Reserve />
       </Page>
     </>
