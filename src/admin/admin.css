@@ -1,0 +1,229 @@
+/* Admin dashboard (/admin) — same gold & black palette, built for reading and quick actions */
+
+.adm {
+  min-height: 100vh;
+  background: var(--ink);
+  color: var(--ivory);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.adm--center { display: grid; place-items: center; padding: 24px 16px; }
+.adm a { color: var(--gold-light); }
+.adm a:hover { text-decoration: underline; }
+.adm .stars .star { width: 15px; height: 15px; }
+.adm-muted { color: var(--muted); font-size: 13px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- buttons & inputs ---------- */
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ivory) !important;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none !important;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s;
+}
+.adm-btn:hover { border-color: var(--gold); background: rgba(212, 166, 74, 0.08); }
+.adm-btn:disabled { opacity: 0.5; cursor: default; }
+.adm-btn--gold { justify-content: center; background: var(--gold); border-color: var(--gold); color: var(--black) !important; font-weight: 500; padding: 13px 18px; }
+.adm-btn--gold:hover { background: var(--gold-light); }
+.adm-btn--danger { border-color: rgba(226, 120, 100, 0.4); color: #f0a898 !important; }
+.adm-btn--danger:hover { border-color: #e27864; background: rgba(226, 120, 100, 0.1); }
+
+.adm-field { display: flex; flex-direction: column; gap: 6px; }
+.adm-field span { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.adm input,
+.adm select {
+  background: var(--ink-2);
+  border: 1px solid rgba(239, 230, 210, 0.18);
+  border-radius: 4px;
+  padding: 10px 12px;
+  color: var(--ivory);
+  font-size: 15px;
+  color-scheme: dark;
+  outline: none;
+}
+.adm input:focus,
+.adm select:focus { border-color: var(--gold); }
+.adm select { cursor: pointer; }
+.adm select option { background: var(--ink); }
+
+.adm-error {
+  padding: 10px 14px;
+  border: 1px solid rgba(226, 120, 100, 0.45);
+  border-radius: 4px;
+  background: rgba(226, 120, 100, 0.08);
+  color: #f0a898;
+  font-size: 14px;
+}
+
+/* ---------- sign in ---------- */
+.adm-login {
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 36px 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink-2);
+}
+.adm-login__crest { width: 56px; margin: 0 auto; }
+.adm-login__title,
+.adm-brand span {
+  font-family: var(--caps);
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-align: center;
+}
+.adm-login__title { font-size: 16px; margin-bottom: 6px; }
+.adm-login__title i,
+.adm-brand i { color: var(--gold); font-style: normal; }
+.adm-login__back { text-align: center; font-size: 13px; }
+
+/* ---------- shell ---------- */
+.adm-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  padding: 12px clamp(16px, 3vw, 32px);
+  border-bottom: 1px solid var(--line);
+  background: rgba(8, 7, 6, 0.94);
+  backdrop-filter: blur(8px);
+}
+.adm-brand { display: flex; align-items: center; gap: 12px; color: var(--ivory) !important; text-decoration: none !important; }
+.adm-brand img { width: 26px; }
+.adm-brand span { font-size: 13px; }
+.adm-tabs { display: flex; gap: 4px; }
+.adm-tabs a {
+  position: relative;
+  padding: 8px 14px;
+  border-radius: 4px;
+  color: var(--muted) !important;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-decoration: none !important;
+}
+.adm-tabs a:hover { color: var(--ivory) !important; }
+.adm-tabs a.active { color: var(--black) !important; background: var(--gold); }
+.adm-badge {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #e27864;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+}
+.adm-top__end { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+/* the site sets main { pointer-events: none } for its scroll stage; the dashboard needs clicks */
+.adm-main { pointer-events: auto; max-width: 1240px; margin: 0 auto; padding: 28px clamp(16px, 3vw, 32px) 64px; display: flex; flex-direction: column; gap: 20px; }
+.adm-h1 { font-family: var(--serif); font-weight: 400; font-size: 34px; line-height: 1.1; }
+.adm-h1 .adm-muted { font-size: 20px; }
+.adm-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.adm-lead { margin-top: -10px; }
+.adm-link { font-size: 13px; }
+.adm-empty { padding: 48px 20px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; }
+
+/* ---------- overview ---------- */
+.adm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.adm-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink-2);
+}
+.adm-stat__label { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); }
+.adm-stat__value { font-family: var(--serif); font-size: 44px; line-height: 1.1; }
+
+.adm-cols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start; }
+.adm-panel { padding: 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--ink-2); }
+.adm-panel__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.adm-panel h2 { font-family: var(--serif); font-weight: 400; font-size: 22px; }
+.adm-mini { list-style: none; }
+.adm-mini li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(212, 166, 74, 0.12);
+}
+.adm-quote { margin: 6px 0; font-family: var(--serif); font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
+
+/* ---------- status pills ---------- */
+.adm-pill,
+.adm-status {
+  border-radius: 20px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.adm-pill { padding: 3px 10px; }
+.adm .adm-status { padding: 5px 10px; }
+.adm-pill--new { color: #f3d68a; background: rgba(212, 166, 74, 0.14); border: 1px solid rgba(212, 166, 74, 0.45) !important; }
+.adm-pill--confirmed { color: #9fdcae; background: rgba(110, 190, 130, 0.12); border: 1px solid rgba(110, 190, 130, 0.45) !important; }
+.adm-pill--cancelled { color: var(--muted); background: rgba(239, 230, 210, 0.05); border: 1px solid rgba(239, 230, 210, 0.2) !important; }
+
+/* ---------- filters & tables ---------- */
+.adm-filters { display: flex; gap: 10px; flex-wrap: wrap; }
+.adm-filters input { flex: 1 1 220px; }
+
+.adm-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.adm-table { width: 100%; border-collapse: collapse; min-width: 880px; }
+.adm-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+}
+.adm-table td { padding: 14px; vertical-align: top; border-bottom: 1px solid rgba(212, 166, 74, 0.1); }
+.adm-table tr:last-child td { border-bottom: 0; }
+.adm-table tr.is-new td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+.adm-table td > div { margin-top: 2px; overflow-wrap: anywhere; }
+.adm-nowrap { white-space: nowrap; }
+
+/* ---------- reviews ---------- */
+.adm-reviews { list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.adm-review { display: flex; flex-direction: column; padding: 18px 20px; border: 1px solid var(--line); border-radius: 8px; background: var(--ink-2); }
+.adm-review__top,
+.adm-review__foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.adm-review .adm-quote { flex: 1; margin: 10px 0 14px; }
+.adm-review__foot { font-size: 14px; }
+
+@media (max-width: 900px) {
+  .adm-stats { grid-template-columns: 1fr 1fr; }
+  .adm-cols,
+  .adm-reviews { grid-template-columns: 1fr; }
+  .adm-top__end { margin-left: 0; }
+}
+@media (max-width: 480px) {
+  .adm-stat__value { font-size: 34px; }
+  .adm-tabs a { padding: 8px 10px; }
+  .adm-h1 { font-size: 28px; }
+}

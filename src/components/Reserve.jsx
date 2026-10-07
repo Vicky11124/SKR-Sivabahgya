@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 import { useSite } from '../site';
 import { venues } from '../data/venues';
+import { api } from '../lib/api';
 import Lines from './Lines';
 
 const today = new Date().toISOString().split('T')[0];
@@ -13,7 +14,10 @@ export default function Reserve() {
   const [arrival, setArrival] = useState('');
   const [departure, setDeparture] = useState('');
   const [guests, setGuests] = useState('2');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   useGSAP(() => {
     if (reduceMotion) return;
@@ -27,12 +31,26 @@ export default function Reserve() {
     });
   }, { scope: ref });
 
-  // TODO: connect to email / WhatsApp / a booking system — this only confirms on screen
-  const submit = e => {
+  // Saved on the server as a booking request; the team sees it in the admin dashboard (/admin)
+  const submit = async e => {
     e.preventDefault();
+    if (sending) return;
+    if (!name.trim()) return setMessage('Kindly add your name.');
+    if ((phone.match(/\d/g) || []).length < 7) return setMessage('Kindly add a phone number we can reach you on.');
     if (!arrival || !departure) return setMessage('Kindly choose your arrival and departure dates.');
     if (departure <= arrival) return setMessage('Departure should be after arrival.');
-    setMessage(`Thank you. Our ${location} desk will confirm your stay for ${guests}, ${fmt(arrival)} – ${fmt(departure)}.`);
+
+    setSending(true);
+    setMessage('');
+    try {
+      await api('/bookings', { method: 'POST', body: { name: name.trim(), phone: phone.trim(), location, arrival, departure, guests } });
+      setMessage(`Thank you, ${name.trim()}. Our ${location} desk will call you to confirm your stay for ${guests}, ${fmt(arrival)} – ${fmt(departure)}.`);
+      setName(''); setPhone(''); setArrival(''); setDeparture('');
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -42,6 +60,14 @@ export default function Reserve() {
       <Lines className="display display--xl" lines={['Your stay,', <em>awaits.</em>]} />
 
       <form className="booking" noValidate onSubmit={submit}>
+        <label className="field field--name">
+          <span>Your name</span>
+          <input value={name} maxLength={80} onChange={e => setName(e.target.value)} autoComplete="name" />
+        </label>
+        <label className="field field--phone">
+          <span>Phone</span>
+          <input type="tel" value={phone} maxLength={30} onChange={e => setPhone(e.target.value)} autoComplete="tel" inputMode="tel" />
+        </label>
         <label className="field">
           <span>Location</span>
           <select value={location} onChange={e => setLocation(e.target.value)}>
@@ -62,7 +88,9 @@ export default function Reserve() {
             {['1', '2', '3', '4', '5+'].map(n => <option key={n}>{n}</option>)}
           </select>
         </label>
-        <button type="submit" className="btn-gold" data-magnetic><span>Check availability</span></button>
+        <button type="submit" className="btn-gold" data-magnetic disabled={sending}>
+          <span>{sending ? 'Sending…' : 'Request booking'}</span>
+        </button>
       </form>
       <p className="booking__msg" role="status" aria-live="polite">{message}</p>
     </section>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Lenis from 'lenis';
 import { gsap, ScrollTrigger, reduceMotion } from './motion';
@@ -15,6 +15,9 @@ import Places from './pages/Places';
 import Place from './pages/Place';
 import Reviews from './pages/Reviews';
 
+// Loaded only when someone opens /admin, so visitors never download it
+const Admin = lazy(() => import('./admin/Admin'));
+
 /*
   Diagonal curtain: its edge runs corner-to-corner and travels from the bottom-right
   to the top-left. d is how far the edge has travelled (0 → 200, in % of the screen).
@@ -28,7 +31,10 @@ const sweepOut = d => `polygon(${300 - d}% -100%, -100% -100%, -100% ${300 - d}%
 export default function App() {
   return (
     <BrowserRouter>
-      <Site />
+      <Routes>
+        <Route path="/admin/*" element={<Suspense fallback={null}><Admin /></Suspense>} />
+        <Route path="*" element={<Site />} />
+      </Routes>
     </BrowserRouter>
   );
 }
