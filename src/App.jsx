@@ -12,7 +12,18 @@ import Lightbox from './components/Lightbox';
 import Home from './pages/Home';
 import About from './pages/About';
 import Places from './pages/Places';
+import Place from './pages/Place';
 import Reviews from './pages/Reviews';
+
+/*
+  Diagonal curtain: its edge runs corner-to-corner and travels from the bottom-right
+  to the top-left. d is how far the edge has travelled (0 → 200, in % of the screen).
+  Both shapes keep a fixed number of points so GSAP can tween between them.
+*/
+// covers the part of the screen where x + y ≥ 200 − d (grows out of the bottom-right corner)
+const sweepIn = d => `polygon(${300 - d}% -100%, 300% -100%, 300% 300%, -100% 300%, -100% ${300 - d}%)`;
+// covers where x + y ≤ 200 − d (shrinks away into the top-left corner)
+const sweepOut = d => `polygon(${300 - d}% -100%, -100% -100%, -100% ${300 - d}%)`;
 
 export default function App() {
   return (
@@ -108,7 +119,7 @@ function Site() {
     const curtain = curtainRef.current;
     gsap.timeline()
       .set(curtain, { autoAlpha: 1 })
-      .fromTo(curtain, { clipPath: 'inset(100% 0% 0% 0%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 0.9, ease: 'expo.inOut' })
+      .fromTo(curtain, { clipPath: sweepIn(0) }, { clipPath: sweepIn(200), duration: 1, ease: 'expo.inOut' })
       .fromTo(curtain.firstChild, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: 'expo.out' }, '-=0.35')
       .add(() => navigate(dest), '+=0.05');
   }, [navigate, scrollToTarget]);
@@ -141,7 +152,7 @@ function Site() {
       }
     })
       .to(curtain.firstChild, { opacity: 0, y: -24, duration: 0.45, ease: 'power2.in' })
-      .to(curtain, { clipPath: 'inset(0% 0% 100% 0%)', duration: 1, ease: 'expo.inOut' }, 0.2);
+      .fromTo(curtain, { clipPath: sweepOut(0) }, { clipPath: sweepOut(200), duration: 1.1, ease: 'expo.inOut' }, 0.2);
   }, [route.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const site = useMemo(() => ({
@@ -170,6 +181,7 @@ function Site() {
         <Route path="/" element={<Home introPending={introPending} onIntroDone={finishIntro} />} />
         <Route path="/about" element={<About />} />
         <Route path="/places" element={<Places />} />
+        <Route path="/places/:id" element={<Place />} />
         <Route path="/reviews" element={<Reviews />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

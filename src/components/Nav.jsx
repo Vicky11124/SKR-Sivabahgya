@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { PAGES } from '../data/pages';
+import { PAGES, isActive, hasReserve } from '../data/pages';
 import SiteLink from './SiteLink';
 
 export default function Nav({ menuOpen, setMenuOpen }) {
@@ -12,7 +12,7 @@ export default function Nav({ menuOpen, setMenuOpen }) {
     let lastY = scrollY;
     const onScroll = () => {
       const y = scrollY;
-      setSolid(y > innerHeight * (pathname === '/' ? 0.75 : 0.2));
+      setSolid(y > innerHeight * (pathname === '/' || pathname === '/about' ? 0.75 : 0.2));
       setHidden(y > lastY && y > innerHeight * 0.6);
       lastY = y;
     };
@@ -21,10 +21,10 @@ export default function Nav({ menuOpen, setMenuOpen }) {
     return () => removeEventListener('scroll', onScroll);
   }, [pathname]);
 
-  // The booking form lives on Home and Places; elsewhere, Reserve takes you to Places
-  const reserveTo = pathname === '/' || pathname === '/places' ? '#reserve' : '/places#reserve';
+  // The booking form lives on Home and the Places pages; elsewhere, Reserve takes you to Places
+  const reserveTo = hasReserve(pathname) ? '#reserve' : '/places#reserve';
   const links = PAGES.map(({ path, label }) => (
-    <SiteLink key={path} to={path} className={pathname === path ? 'is-active' : undefined} aria-current={pathname === path ? 'page' : undefined}>
+    <SiteLink key={path} to={path} className={isActive(path, pathname) ? 'is-active' : undefined} aria-current={pathname === path ? 'page' : undefined}>
       {label}
     </SiteLink>
   ));

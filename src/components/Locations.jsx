@@ -1,15 +1,22 @@
 import { useRef } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 import { venues } from '../data/venues';
+import { placePath } from '../data/pages';
 import Lines from './Lines';
 import SiteLink from './SiteLink';
 
 /*
-  Three photo boxes, one per address.
-  hrefBase: '' links to sections on the same page; '/places' links across to the Places page.
+  Photo boxes, one per address, each opening that place's own page.
+  exclude: hide one place (used for "other addresses" on a place page).
 */
-export default function Locations({ hrefBase = '', showHead = true }) {
+export default function Locations({
+  exclude,
+  showHead = true,
+  eyebrow = 'Our Addresses',
+  lines = ['Three addresses.', <em>One welcome.</em>]
+}) {
   const ref = useRef(null);
+  const list = venues.filter(v => v.id !== exclude);
 
   useGSAP(() => {
     if (reduceMotion) return;
@@ -25,14 +32,14 @@ export default function Locations({ hrefBase = '', showHead = true }) {
     <section className={`locations${showHead ? '' : ' locations--bare'}`} id="locations" ref={ref}>
       {showHead && (
         <div className="locations__head">
-          <p className="eyebrow">Our Addresses</p>
-          <Lines lines={['Three addresses.', <em>One welcome.</em>]} />
+          <p className="eyebrow">{eyebrow}</p>
+          <Lines lines={lines} />
         </div>
       )}
 
-      <div className="places">
-        {venues.map(v => (
-          <SiteLink to={`${hrefBase}#${v.id}`} className="place" key={v.id}>
+      <div className={`places${list.length === 2 ? ' places--pair' : ''}`}>
+        {list.map(v => (
+          <SiteLink to={placePath(v.id)} className="place" key={v.id}>
             <span className="place__media">
               <img src={v.cover.src} alt={v.cover.alt} loading="lazy" width="900" height="1125" />
             </span>

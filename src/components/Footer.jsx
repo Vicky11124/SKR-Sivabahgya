@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 import { contact } from '../data/venues';
-import { PAGES } from '../data/pages';
+import { PAGES, placePath } from '../data/pages';
 import SiteLink from './SiteLink';
 
 const tel = n => `tel:${n.replace(/\s/g, '')}`;
@@ -28,9 +28,9 @@ export default function Footer() {
       </div>
 
       <div className="footer__cols">
-        <div><h4>Kodaikanal</h4><p>Adventure Resort<br />Kodaikanal, Tamil Nadu</p></div>
-        <div><h4>Arapalayam</h4><p>47, D.D. Main Road, Arappalayam<br />Madurai 625016</p></div>
-        <div><h4>Kochadai</h4><p>Service Apartments<br />Kochadai, Madurai</p></div>
+        <div><h4><SiteLink to={placePath('kodaikanal')}>Kodaikanal</SiteLink></h4><p>Adventure Resort<br />Kodaikanal, Tamil Nadu</p></div>
+        <div><h4><SiteLink to={placePath('arapalayam')}>Arapalayam</SiteLink></h4><p>47, D.D. Main Road, Arappalayam<br />Madurai 625016</p></div>
+        <div><h4><SiteLink to={placePath('kochadai')}>Kochadai</SiteLink></h4><p>Service Apartments<br />Kochadai, Madurai</p></div>
         <div>
           <h4>Contact</h4>
           <p>

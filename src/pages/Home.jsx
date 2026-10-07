@@ -20,7 +20,7 @@ export default function Home({ introPending, onIntroDone }) {
       <Page hero>
         <Statement />
         <Motif />
-        <Locations hrefBase="/places" />
+        <Locations />
         <Invite />
         <Marquee />
         <Reserve />
