@@ -6,7 +6,7 @@ import SiteLink from './SiteLink';
 import Gallery from './Gallery';
 import PlaceMap from './PlaceMap';
 
-/* A place's own page: intro, details beside the map, rooms & rates, then the gallery */
+/* A place's own page: intro, details beside the map, rooms & rates as cards, then the drifting gallery */
 export default function Venue({ venue }) {
   const ref = useRef(null);
   const { transitioning } = useSite();
@@ -23,7 +23,7 @@ export default function Venue({ venue }) {
       .from('.venue__desc, .venue__notice, .venue__stats > div, .venue__actions', { opacity: 0, y: 24, duration: 1.2, stagger: 0.07, ease: 'expo.out' }, 0.25);
 
     // The rest reveals as you scroll to it
-    gsap.from('.venue__facts > div, .floors li', {
+    gsap.from('.venue__facts > div, .floors li, .venue__map', {
       opacity: 0, y: 24, duration: 1.1, stagger: 0.06, ease: 'expo.out',
       scrollTrigger: { trigger: '.venue__details', start: 'top 80%' }
     });
@@ -81,7 +81,7 @@ export default function Venue({ venue }) {
           {venue.floors && (
             <>
               <p className="eyebrow venue__sub">Floor by floor</p>
-              <ol className="floors">
+              <ol className="floors" style={{ '--n': venue.floors.length }}>
                 {venue.floors.map(([floor, detail]) => (
                   <li key={floor}><span>{floor}</span><span>{detail}</span></li>
                 ))}
@@ -106,7 +106,7 @@ export default function Venue({ venue }) {
               <span className="rate__name">{room.name}</span>
               <span className="rate__note">{room.note}</span>
               <span className="rate__price">
-                {rupees(room.price)}
+                <b>{rupees(room.price)}</b>
                 <small>{room.unit}</small>
               </span>
             </li>

@@ -1,122 +1,75 @@
-import { useCallback, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
-import { gsap, ScrollTrigger, useGSAP, reduceMotion } from '../motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { gsap, useGSAP, reduceMotion } from '../motion';
 import { useSite } from '../site';
+import DriftWall from './DriftWall';
 
-const VISIBLE = 8;
 const pad = n => String(n).padStart(2, '0');
 
-/* Thumbnail that fades in once it has actually loaded */
-function Thumb({ photo }) {
-  const [loaded, setLoaded] = useState(false);
-  const ref = useCallback(img => {
-    if (img?.complete && img.naturalWidth) setLoaded(true);
-  }, []);
+/* Wall size for the space available: fewer, smaller columns on narrow screens */
+const layoutFor = width =>
+  width < 600 ? { columns: 4, tileWidth: 150, tileHeight: 130, gap: 10, height: 440 }
+  : width < 1000 ? { columns: 5, tileWidth: 200, tileHeight: 180, gap: 12, height: 520 }
+  : { columns: 7, tileWidth: 244, tileHeight: 220, gap: 12, height: 600 };
 
-  return (
-    <img
-      ref={ref}
-      src={photo.thumb}
-      alt={photo.alt}
-      width={photo.w}
-      height={photo.h}
-      loading="lazy"
-      decoding="async"
-      className={loaded ? 'is-loaded' : undefined}
-      onLoad={() => setLoaded(true)}
-    />
-  );
-}
-
-/* Justified rows: every photo keeps its shape and each row shares one height (see .g in styles.css) */
+/* A place's photos as a slowly drifting 3D wall; any tile opens the full-screen viewer */
 export default function Gallery({ venue }) {
-  const { openLightbox, scrollToTarget } = useSite();
+  const { openLightbox } = useSite();
   const ref = useRef(null);
-  const gridRef = useRef(null);
-  const [open, setOpen] = useState(false);       // extras rendered
-  const [expanded, setExpanded] = useState(false); // button state
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
   const { photos } = venue;
 
-  const { contextSafe } = useGSAP(() => {
+  useEffect(() => {
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const items = useMemo(
+    () => photos.map((p, index) => ({ image: p.thumb, title: p.alt, index })),
+    [photos]
+  );
+  const { height, ...size } = layoutFor(width);
+
+  useGSAP(() => {
     if (reduceMotion) return;
-    const tiles = gsap.utils.toArray('.g__item:not(.is-extra)');
-    gsap.set(tiles, { opacity: 0, y: 50 });
-    ScrollTrigger.batch(tiles, {
-      start: 'top 92%',
-      once: true,
-      onEnter: batch => gsap.to(batch, { opacity: 1, y: 0, duration: 1.3, stagger: 0.08, ease: 'expo.out' })
+    gsap.from('.gallery__wall', {
+      opacity: 0, y: 60, duration: 1.6, ease: 'expo.out',
+      scrollTrigger: { trigger: ref.current, start: 'top 85%' }
     });
   }, { scope: ref });
 
-  const heightWith = state => {
-    flushSync(() => setOpen(state));
-    return gridRef.current.offsetHeight;
-  };
-
-  const toggle = contextSafe(() => {
-    const grid = gridRef.current;
-    const opening = !expanded;
-    setExpanded(opening);
-
-    if (reduceMotion) {
-      setOpen(opening);
-      return;
-    }
-
-    const from = grid.offsetHeight;
-    if (opening) {
-      const to = heightWith(true);
-      gsap.fromTo(grid, { height: from, overflow: 'hidden' }, {
-        height: to, duration: 1.2, ease: 'expo.inOut', clearProps: 'height,overflow',
-        onComplete: () => ScrollTrigger.refresh()
-      });
-      gsap.fromTo('.is-extra', { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 1.1, stagger: 0.06, ease: 'expo.out', delay: 0.15 });
-    } else {
-      // measure the closed height, then keep the extras on screen while the grid closes over them
-      const to = heightWith(false);
-      heightWith(true);
-      gsap.fromTo(grid, { height: from, overflow: 'hidden' }, {
-        height: to, duration: 1, ease: 'expo.inOut',
-        onComplete: () => {
-          setOpen(false);
-          gsap.set(grid, { clearProps: 'height,overflow' });
-          ScrollTrigger.refresh();
-        }
-      });
-      if (ref.current.getBoundingClientRect().top < 0) scrollToTarget(ref.current.closest('.venue'));
-    }
-  });
-
   return (
-    <div className={`gallery${open ? ' is-open' : ''}`} ref={ref}>
+    <div className="gallery" ref={ref}>
       <div className="gallery__head">
         <span>Gallery</span>
         <span>{pad(photos.length)} photographs</span>
       </div>
 
-      <div className="g" ref={gridRef}>
-        {photos.map((photo, i) => (
-          <figure
-            key={photo.src}
-            className={`g__item${i >= VISIBLE ? ' is-extra' : ''}`}
-            style={{ '--ar': (photo.w / photo.h).toFixed(3) }}
-          >
-            <button
-              className="g__btn"
-              aria-label={`Open photo ${i + 1} of ${photos.length}`}
-              onClick={() => openLightbox(venue.id, i)}
-            >
-              <Thumb photo={photo} />
-            </button>
-          </figure>
-        ))}
+      <div className="gallery__wall" style={{ height }}>
+        <DriftWall
+          items={items}
+          {...size}
+          tilt={16}
+          turn={-14}
+          perspective={1200}
+          depth={120}
+          speed={18}
+          direction="up"
+          variance={0.5}
+          parallax={0.6}
+          lift={64}
+          fade={0.2}
+          dim={0.6}
+          overlayColor="#080706"
+          radius={10}
+          label={`${venue.name} photographs`}
+          onItemClick={item => openLightbox(venue.id, item.index)}
+        />
       </div>
 
-      {photos.length > VISIBLE && (
-        <button className="gallery__more" aria-expanded={expanded} onClick={toggle}>
-          <span>{expanded ? 'Show fewer' : `View all ${photos.length} photos`}</span>
-        </button>
-      )}
+      <button className="gallery__more" onClick={() => openLightbox(venue.id, 0)}>
+        <span>View all {photos.length} photos</span>
+      </button>
     </div>
   );
 }
