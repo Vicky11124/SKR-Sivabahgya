@@ -38,7 +38,7 @@ export default function Nav({ menuOpen, setMenuOpen }) {
         </SiteLink>
         <nav className="nav__links" aria-label="Primary">
           {links}
-          <SiteLink to={reserveTo} className="nav__cta" data-magnetic>Reserve</SiteLink>
+          <SiteLink to={reserveTo} className="nav__cta">Reserve</SiteLink>
         </nav>
         <button
           className="nav__toggle"

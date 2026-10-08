@@ -5,30 +5,39 @@ import DriftWall from './DriftWall';
 
 const pad = n => String(n).padStart(2, '0');
 
-/* Wall size for the space available: fewer, smaller columns on narrow screens */
-const layoutFor = width =>
-  width < 600 ? { columns: 4, tileWidth: 150, tileHeight: 130, gap: 10, height: 440 }
-  : width < 1000 ? { columns: 5, tileWidth: 200, tileHeight: 180, gap: 12, height: 520 }
-  : { columns: 7, tileWidth: 244, tileHeight: 220, gap: 12, height: 600 };
+/*
+  Wall size for the screen it is on: tiles scale with the width, there are always enough columns
+  to reach both edges (the wall is tilted, so a couple more than fit flat), and the wall is
+  about as tall as the window.
+*/
+const layoutFor = (width, viewHeight) => {
+  const tileWidth = Math.round(Math.min(320, Math.max(140, width / 6.2)));
+  const tileHeight = Math.round(tileWidth * 0.86);
+  const gap = width < 600 ? 10 : 14;
+  const columns = Math.ceil(width / (tileWidth + gap)) + 2;
+  const height = Math.round(Math.min(1000, Math.max(440, viewHeight * 0.9)));
+  return { columns, tileWidth, tileHeight, gap, height };
+};
 
 /* A place's photos as a slowly drifting 3D wall; any tile opens the full-screen viewer */
 export default function Gallery({ venue }) {
   const { openLightbox } = useSite();
   const ref = useRef(null);
-  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1280 : window.innerWidth));
+  const [screen, setScreen] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const { photos } = venue;
 
   useEffect(() => {
-    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    ro.observe(ref.current);
-    return () => ro.disconnect();
+    // the wall runs edge to edge, so the window size is the size that matters
+    const onResize = () => setScreen({ width: window.innerWidth, height: window.innerHeight });
+    addEventListener('resize', onResize);
+    return () => removeEventListener('resize', onResize);
   }, []);
 
   const items = useMemo(
     () => photos.map((p, index) => ({ image: p.thumb, title: p.alt, index })),
     [photos]
   );
-  const { height, ...size } = layoutFor(width);
+  const { height, ...size } = layoutFor(screen.width, screen.height);
 
   useGSAP(() => {
     if (reduceMotion) return;
@@ -58,9 +67,9 @@ export default function Gallery({ venue }) {
           variance={0.5}
           parallax={0.6}
           lift={64}
-          fade={0.2}
-          dim={0.6}
-          overlayColor="#080706"
+          fade={0.12}
+          dim={1}
+          overlayColor="transparent"
           radius={10}
           label={`${venue.name} photographs`}
           onItemClick={item => openLightbox(venue.id, item.index)}
