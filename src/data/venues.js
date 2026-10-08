@@ -8,7 +8,7 @@ const maps = q => `https://www.google.com/maps/search/?api=1&query=${encodeURICo
   - facts:   the details list beside the map
   - floors:  how the building is laid out (optional)
   - rooms:   room types and rates
-  - backdrop: optional photo fixed behind the place page
+  - backdrop: optional photo fixed behind the place page (position: optional CSS object-position)
   - pin:     map position. These are the neighbourhood centres from OpenStreetMap —
              replace with the exact building coordinates (right-click the spot in
              Google Maps to copy them) for a precise pin.
@@ -73,6 +73,7 @@ export const venues = [
       { name: 'Premium', note: 'Generous rooms with added touches', price: 3500, unit: 'per night' },
       { name: 'Superior', note: 'Our finest rooms in the city', price: 4500, unit: 'per night' }
     ],
+    backdrop: { src: '/assets/gallery/arapalayam/backdrop.webp', small: '/assets/gallery/arapalayam/backdrop-sm.webp', position: '40% 55%' },
     pin: { lat: 9.9342, lng: 78.103, label: '47, D.D. Main Road, Arappalayam' },
     directions: maps('47 D.D. Main Road Arappalayam Madurai 625016'),
     photos: arapalayamPhotos
@@ -99,6 +100,7 @@ export const venues = [
     rooms: [
       { name: 'Entire Apartment', note: '3 bedrooms, hall, kitchen, garden, terrace & jacuzzi', price: 13000, unit: 'per day + taxes' }
     ],
+    backdrop: { src: '/assets/gallery/kochadai/backdrop.webp', small: '/assets/gallery/kochadai/backdrop-sm.webp', position: '30% 50%' },
     pin: { lat: 9.9405, lng: 78.084, label: 'Annai Bharath community, Kochadai' },
     directions: maps('Kochadai, Madurai, Tamil Nadu'),
     photos: kochadaiPhotos

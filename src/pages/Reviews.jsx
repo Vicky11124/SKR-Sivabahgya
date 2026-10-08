@@ -20,6 +20,9 @@ const SORTS = {
 
 /* ---------- Opening: heading beside the overall score ---------- */
 
+const R = 54; // dial radius
+const ARC = 2 * Math.PI * R;
+
 function Scoreboard({ reviews, ready, onWrite }) {
   const count = reviews.length;
   const avg = average(reviews);
@@ -37,23 +40,56 @@ function Scoreboard({ reviews, ready, onWrite }) {
 
       <div className="rhero__score" aria-live="polite">
         <span className="rhero__label">Overall rating</span>
-        <div className="rhero__big">
-          <span className="rhero__num">{ready && count ? avg.toFixed(1) : '—'}</span>
-          <span className="rhero__of">/ 5</span>
+        <div className="rhero__body">
+          {/* a gold dial that fills to the average */}
+          <div className="dial">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <defs>
+                <linearGradient id="dial-gold" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#f3d68a" />
+                  <stop offset="0.5" stopColor="#c9962f" />
+                  <stop offset="1" stopColor="#8a6420" />
+                </linearGradient>
+              </defs>
+              <circle className="dial__track" cx="60" cy="60" r={R} />
+              <circle
+                className="dial__fill"
+                cx="60" cy="60" r={R}
+                strokeDasharray={ARC}
+                strokeDashoffset={ARC * (1 - (ready && count ? avg / 5 : 0))}
+              />
+            </svg>
+            <span className="dial__num">{ready && count ? avg.toFixed(1) : '–'}</span>
+            <span className="dial__of">out of 5</span>
+          </div>
+
+          <div className="rhero__side">
+            <Stars value={count ? Math.round(avg * 2) / 2 : 0} label={count ? `Average ${avg.toFixed(1)} out of 5` : 'No ratings yet'} />
+            <span className="rhero__count">
+              {!ready ? 'Loading reviews…' : count ? <><b>{count}</b> review{count > 1 ? 's' : ''}</> : 'No reviews yet'}
+            </span>
+            <ul className="dist" aria-label="Ratings breakdown">
+              {[5, 4, 3, 2, 1].map(n => {
+                const c = reviews.filter(r => r.rating === n).length;
+                return (
+                  <li key={n}>
+                    <span className="dist__n">{n}<i aria-hidden="true">★</i></span>
+                    <span className="dist__bar"><i style={{ transform: `scaleX(${count ? c / count : 0})` }} /></span>
+                    <span className="dist__c">{c}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
-        <Stars value={count ? Math.round(avg * 2) / 2 : 0} label={count ? `Average ${avg.toFixed(1)} out of 5` : 'No ratings yet'} />
-        <span className="rhero__count">
-          {!ready ? 'Loading reviews…' : count ? `Based on ${count} review${count > 1 ? 's' : ''}` : 'No reviews yet'}
-        </span>
       </div>
     </header>
   );
 }
 
-/* ---------- Instrument strip: each place's average, and the spread of ratings ---------- */
+/* ---------- Instrument strip: each place's average ---------- */
 
 function Gauges({ reviews }) {
-  const count = reviews.length;
   return (
     <section className="gauges" aria-label="Ratings by place">
       {venues.map(v => {
@@ -62,28 +98,15 @@ function Gauges({ reviews }) {
         return (
           <div className="gauge" key={v.id}>
             <span className="gauge__label">{v.num} · {v.name}</span>
-            <span className="gauge__value">{mine.length ? avg.toFixed(1) : '—'}</span>
+            <span className="gauge__value">
+              {mine.length ? avg.toFixed(1) : '–'}
+              {mine.length > 0 && <small>/ 5</small>}
+            </span>
             <span className="gauge__track" aria-hidden="true"><i style={{ transform: `scaleX(${avg / 5})` }} /></span>
             <span className="gauge__meta">{mine.length ? `${mine.length} review${mine.length > 1 ? 's' : ''}` : 'Awaiting first review'}</span>
           </div>
         );
       })}
-
-      <div className="gauge gauge--dist">
-        <span className="gauge__label">Ratings breakdown</span>
-        <ul className="dist">
-          {[5, 4, 3, 2, 1].map(n => {
-            const c = reviews.filter(r => r.rating === n).length;
-            return (
-              <li key={n}>
-                <span>{n}★</span>
-                <span className="dist__bar"><i style={{ transform: `scaleX(${count ? c / count : 0})` }} /></span>
-                <span>{c}</span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
     </section>
   );
 }
@@ -297,6 +320,21 @@ export default function Reviews() {
     <Page className="page--reviews">
       <div className="rpage" ref={ref}>
         <Scoreboard reviews={reviews} ready={load !== 'loading'} onWrite={toForm} />
+        <section className="write" id="write" aria-label="Write a review">
+          <div className="write__copy">
+            <p className="eyebrow">Your turn</p>
+            <h2 className="write__title">Share your <em>stay.</em></h2>
+            <p className="write__note">
+              A few honest lines help the next guest choose — the room, the view, the people who looked after you.
+            </p>
+            <ul className="write__tips">
+              <li>Takes about a minute</li>
+              <li>Appears on this page straight away</li>
+              <li>Just your first name is fine</li>
+            </ul>
+          </div>
+          <ReviewForm onAdd={add} />
+        </section>
         <Gauges reviews={reviews} />
 
         {load === 'ready' && featured && <Feature review={featured} />}
@@ -348,21 +386,6 @@ export default function Reviews() {
           )}
         </section>
 
-        <section className="write" id="write" aria-label="Write a review">
-          <div className="write__copy">
-            <p className="eyebrow">Your turn</p>
-            <h2 className="write__title">Share your <em>stay.</em></h2>
-            <p className="write__note">
-              A few honest lines help the next guest choose — the room, the view, the people who looked after you.
-            </p>
-            <ul className="write__tips">
-              <li>Takes about a minute</li>
-              <li>Appears on this page straight away</li>
-              <li>Just your first name is fine</li>
-            </ul>
-          </div>
-          <ReviewForm onAdd={add} />
-        </section>
       </div>
     </Page>
   );

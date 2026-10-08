@@ -25,7 +25,7 @@ function Backdrop({ photo }) {
       <div className="backdrop__layer">
         <picture>
           <source media="(max-width: 700px)" srcSet={photo.small} />
-          <img src={photo.src} alt="" />
+          <img src={photo.src} alt="" style={photo.position ? { objectPosition: photo.position } : undefined} />
         </picture>
       </div>
       <div className="backdrop__shade" />
