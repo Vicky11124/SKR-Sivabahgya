@@ -91,7 +91,7 @@ export default function Stage() {
 
       <div className="hero__foot">
         <span>Hotels &amp; Resorts</span>
-        <SiteLink to="#story" className="hero__scroll" aria-label="Scroll to story"><i /></SiteLink>
+        <SiteLink to="#locations" className="hero__scroll" aria-label="Scroll to our places"><i /></SiteLink>
         <span>Scroll to enter</span>
       </div>
     </div>

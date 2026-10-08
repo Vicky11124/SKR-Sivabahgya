@@ -2,7 +2,6 @@ import { useState } from 'react';
 import Intro from '../components/Intro';
 import Stage from '../components/Stage';
 import Page from '../components/Page';
-import Statement from '../components/Statement';
 import Motif from '../components/Motif';
 import Locations from '../components/Locations';
 import Invite from '../components/Invite';
@@ -17,7 +16,6 @@ export default function Home({ introPending, onIntroDone }) {
       {playIntro && <Intro onDone={onIntroDone} />}
       <Stage />
       <Page hero>
-        <Statement />
         <Motif />
         <Locations />
         <Invite />
