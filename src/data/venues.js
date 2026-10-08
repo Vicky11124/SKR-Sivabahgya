@@ -8,6 +8,7 @@ const maps = q => `https://www.google.com/maps/search/?api=1&query=${encodeURICo
   - facts:   the details list beside the map
   - floors:  how the building is laid out (optional)
   - rooms:   room types and rates
+  - backdrop: optional photo fixed behind the place page
   - pin:     map position. These are the neighbourhood centres from OpenStreetMap —
              replace with the exact building coordinates (right-click the spot in
              Google Maps to copy them) for a precise pin.
@@ -37,6 +38,8 @@ export const venues = [
       { name: 'Suite', note: 'Our most spacious rooms, with room to spread out', price: 12000, unit: 'per night' },
       { name: 'Deluxe Room', note: 'Comfortable rooms in wood, linen & soft light', price: 6000, unit: 'per night' }
     ],
+    // Optional: a photo fixed behind the whole place page
+    backdrop: { src: '/assets/gallery/kodaikanal/backdrop.webp', small: '/assets/gallery/kodaikanal/backdrop-sm.webp' },
     pin: { lat: 10.2696, lng: 77.5043, label: 'Vilpatti, Kodaikanal' },
     directions: maps('Vilpatti, Kodaikanal, Tamil Nadu'),
     photos: kodaikanalPhotos
