@@ -1,7 +1,7 @@
 /*
   SKR Sivabhagya — site server.
 
-  - /api/...   reviews and booking requests (public), and the admin API (login required)
+  - /api/...   reviews, room availability and booking requests (public), and the admin API (login required)
   - anything else: the built site from dist/ (run `npm run build` first), with every page
     route falling back to index.html so links like /reviews or /admin open directly.
 
@@ -15,6 +15,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { venues } from '../src/data/venues.js';
 import { openStore } from './store.js';
+import { addDays, findUnit, freeByNight, freeForStay, nightsBetween, quote, todayIST, unitKey } from '../src/lib/stay.js';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 try { process.loadEnvFile(join(root, '.env')); } catch { /* no .env file — use the real environment */ }
@@ -31,9 +32,9 @@ const SESSION_HOURS = 12;
 const sessions = new Map(); // token → expiry time (ms). Restarting the server signs everyone out.
 
 const placeIds = new Set(venues.map(v => v.id));
-const locations = new Set(venues.map(v => v.booking));
-const GUESTS = ['1', '2', '3', '4', '5+'];
+const venueById = id => venues.find(v => v.id === id);
 const STATUSES = ['new', 'confirmed', 'cancelled'];
+const WINDOW = 400; // days ahead that can be booked and are shown in the calendar
 
 /* ---------- small helpers ---------- */
 
@@ -111,33 +112,79 @@ function parseReview(body) {
   return review;
 }
 
+/* Dates and room shared by booking requests and admin blocks; throws on anything out of range */
+function parseStay(body) {
+  const venue = venueById(body.place);
+  if (!venue) throw new HttpError(400, 'Unknown place.');
+  const unit = findUnit(venue, body.floor, body.room);
+  if (!unit) throw new HttpError(400, 'Please choose a floor and room.');
+  const { arrival, departure } = body;
+  // a day of slack, so a guest whose local date is behind India's isn't turned away
+  const earliest = addDays(todayIST(), -1);
+  if (!isDate(arrival) || !isDate(departure)) throw new HttpError(400, 'Kindly choose your arrival and departure dates.');
+  if (arrival < earliest) throw new HttpError(400, 'Arrival date is in the past.');
+  if (departure <= arrival) throw new HttpError(400, 'Departure should be after arrival.');
+  if (departure > addDays(todayIST(), WINDOW)) throw new HttpError(400, 'We take bookings up to a year ahead.');
+  const rooms = body.rooms ?? 1;
+  if (!Number.isInteger(rooms) || rooms < 1 || rooms > unit.count) throw new HttpError(400, `This floor has ${unit.count} such room${unit.count > 1 ? 's' : ''}.`);
+  return { venue, unit, arrival, departure, rooms };
+}
+
 function parseBooking(body) {
+  const { venue, unit, arrival, departure, rooms } = parseStay(body);
+  const guests = body.guests;
+  if (!Number.isInteger(guests) || guests < 1) throw new HttpError(400, 'Please choose the number of guests.');
+  if (guests > rooms * unit.room.sleeps) throw new HttpError(400, `${unit.room.name} sleeps ${unit.room.sleeps} — please add a room for ${guests} guests.`);
+
   const booking = {
     id: randomUUID(),
     name: text(body.name, 80),
     phone: text(body.phone, 30),
     email: text(body.email, 120),
-    location: body.location,
-    arrival: body.arrival,
-    departure: body.departure,
-    guests: body.guests,
+    place: venue.id,
+    location: venue.booking,
+    floor: unit.floor.id,
+    floorName: unit.floor.name,
+    room: unit.room.id,
+    roomName: unit.room.name,
+    rooms,
+    arrival,
+    departure,
+    guests,
+    // priced on the server from the published rates, never trusted from the browser
+    estimate: quote(unit.room.price, rooms, nightsBetween(arrival, departure)),
     note: text(body.note, 500),
     status: 'new',
     createdAt: new Date().toISOString()
   };
-  // a day of slack, so a guest whose local date is behind UTC isn't turned away
-  const earliest = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   if (!booking.name) throw new HttpError(400, 'Please add your name.');
   if ((booking.phone.match(/\d/g) || []).length < 7 || /[^\d\s+()-]/.test(booking.phone)) {
     throw new HttpError(400, 'Please add a valid phone number.');
   }
   if (booking.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(booking.email)) throw new HttpError(400, 'Please check your email address.');
-  if (!locations.has(booking.location)) throw new HttpError(400, 'Unknown location.');
-  if (!isDate(booking.arrival) || !isDate(booking.departure)) throw new HttpError(400, 'Kindly choose your arrival and departure dates.');
-  if (booking.arrival < earliest) throw new HttpError(400, 'Arrival date is in the past.');
-  if (booking.departure <= booking.arrival) throw new HttpError(400, 'Departure should be after arrival.');
-  if (!GUESTS.includes(booking.guests)) throw new HttpError(400, 'Please choose the number of guests.');
   return booking;
+}
+
+/* ---------- availability ---------- */
+
+// Confirmed bookings and admin blocks are what take rooms; new requests don't until confirmed
+const takenAt = (placeId, skipId) => [
+  ...store.bookings.all().filter(b => b.place === placeId && b.status === 'confirmed' && b.room && b.id !== skipId),
+  ...store.blocks.all().filter(b => b.place === placeId)
+];
+
+function availability(venue, skipId) {
+  const from = todayIST();
+  return { from, days: WINDOW, free: freeByNight(venue, takenAt(venue.id, skipId), from, WINDOW) };
+}
+
+/* Throws 409 unless every night of the stay still has enough rooms */
+function assertFree({ place, floor, room, rooms, arrival, departure }, skipId, message) {
+  const { from, free } = availability(venueById(place), skipId);
+  const nights = free[unitKey(floor, room)];
+  // nights before today are history; only check what is still ahead
+  const start = arrival < from ? from : arrival;
+  if (departure > start && freeForStay(nights, from, start, departure) < rooms) throw new HttpError(409, message);
 }
 
 /* ---------- admin sessions ---------- */
@@ -179,9 +226,15 @@ async function api(req, res, path) {
     reviewLimit.hit(ip);
     return send(res, 201, store.reviews.add(review));
   }
+  if (path === '/api/availability' && method === 'GET') {
+    const venue = venueById(new URL(req.url, 'http://localhost').searchParams.get('place'));
+    if (!venue) throw new HttpError(400, 'Unknown place.');
+    return send(res, 200, availability(venue));
+  }
   if (path === '/api/bookings' && method === 'POST') {
     bookingLimit.check(ip);
     const booking = parseBooking(await readJson(req));
+    assertFree(booking, null, 'Sorry — those dates were just taken for this room. Please choose other dates or another floor.');
     bookingLimit.hit(ip);
     store.bookings.add(booking);
     return send(res, 201, { id: booking.id });
@@ -215,9 +268,20 @@ async function api(req, res, path) {
   if (path === '/api/admin/session' && method === 'GET') return send(res, 200, { username: ADMIN_USERNAME });
   if (path === '/api/admin/reviews' && method === 'GET') return send(res, 200, store.reviews.all());
   if (path === '/api/admin/bookings' && method === 'GET') return send(res, 200, store.bookings.all());
+  if (path === '/api/admin/blocks' && method === 'GET') return send(res, 200, store.blocks.all());
+  if (path === '/api/admin/blocks' && method === 'POST') {
+    const body = await readJson(req);
+    const { venue, unit, arrival, departure, rooms } = parseStay(body);
+    const block = {
+      id: randomUUID(), place: venue.id, floor: unit.floor.id, room: unit.room.id, rooms, arrival, departure,
+      note: text(body.note, 200), createdAt: new Date().toISOString()
+    };
+    assertFree(block, null, 'Not enough free rooms on those dates — confirmed bookings or other blocks already take them.');
+    return send(res, 201, store.blocks.add(block));
+  }
 
   const [, , , kind, id, extra] = path.split('/'); // '', api, admin, kind, id
-  if (id && !extra && (kind === 'reviews' || kind === 'bookings')) {
+  if (id && !extra && (kind === 'reviews' || kind === 'bookings' || kind === 'blocks')) {
     const collection = store[kind];
     if (method === 'DELETE') {
       if (!collection.remove(id)) throw new HttpError(404, 'Already deleted.');
@@ -226,6 +290,12 @@ async function api(req, res, path) {
     if (method === 'PATCH' && kind === 'bookings') {
       const { status } = await readJson(req);
       if (!STATUSES.includes(status)) throw new HttpError(400, 'Unknown status.');
+      const current = collection.all().find(b => b.id === id);
+      if (!current) throw new HttpError(404, 'Booking not found.');
+      // confirming takes the rooms, so make sure they are still free
+      if (status === 'confirmed' && current.status !== 'confirmed' && current.room) {
+        assertFree(current, id, 'Those rooms are already taken on some of these dates (by another confirmed booking or a block). Free them first, or move this guest.');
+      }
       const updated = collection.update(id, { status, updatedAt: new Date().toISOString() });
       if (!updated) throw new HttpError(404, 'Booking not found.');
       return send(res, 200, updated);

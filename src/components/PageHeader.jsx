@@ -6,8 +6,9 @@ import Lines from './Lines';
 /*
   Opening block for inner pages; plays once the page-change curtain has lifted.
   hero: fills the first screen and sits low and centred, for pages with a photo backdrop.
+  tall: fills the first screen but keeps the usual layout, so the backdrop shows before the content below.
 */
-export default function PageHeader({ eyebrow, lines, intro, compact = false, hero = false }) {
+export default function PageHeader({ eyebrow, lines, intro, compact = false, hero = false, tall = false }) {
   const ref = useRef(null);
   const { transitioning } = useSite();
 
@@ -19,7 +20,7 @@ export default function PageHeader({ eyebrow, lines, intro, compact = false, her
       .from('.page-head__intro, .page-head__cue', { opacity: 0, y: 24, duration: 1.2, stagger: 0.15, ease: 'expo.out' }, 0.35);
   }, { scope: ref });
 
-  const variant = hero ? ' page-head--hero' : compact ? ' page-head--compact' : '';
+  const variant = hero ? ' page-head--hero' : compact ? ' page-head--compact' : tall ? ' page-head--tall' : '';
 
   return (
     <header className={`page-head${variant}`} ref={ref}>

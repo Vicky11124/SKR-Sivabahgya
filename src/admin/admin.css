@@ -227,3 +227,15 @@
   .adm-tabs a { padding: 8px 10px; }
   .adm-h1 { font-size: 28px; }
 }
+
+/* Availability */
+.adm-avail-nav { display: flex; gap: 6px; }
+.adm-avail { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 12px; }
+.adm-avail__dow { font-size: 11px; text-align: center; opacity: 0.6; }
+.adm-avail__day { display: grid; place-items: center; gap: 2px; padding: 6px 0; border-radius: 4px; font-size: 13px; }
+.adm-avail__day small { font-size: 10px; opacity: 0.75; }
+.adm-avail__day.is-free { background: rgba(110, 180, 120, 0.16); }
+.adm-avail__day.is-some { background: rgba(212, 166, 74, 0.22); }
+.adm-avail__day.is-full { background: rgba(226, 110, 90, 0.28); }
+.adm-avail__day.is-out { opacity: 0.35; }
+.adm-block-form { display: grid; gap: 14px; }

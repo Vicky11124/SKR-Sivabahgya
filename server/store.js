@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /*
-  A tiny JSON-file database: { reviews: [], bookings: [] }.
+  A tiny JSON-file database: { reviews: [], bookings: [], blocks: [] } (blocks: dates marked booked in the admin).
   Everything is kept in memory and written to disk after each change (via a temp file + rename,
   so a crash mid-write never leaves a half-written file). Fine for a hotel site's volume.
 */
@@ -10,12 +10,13 @@ export function openStore(dir) {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, 'db.json');
 
-  let data = { reviews: [], bookings: [] };
+  let data = { reviews: [], bookings: [], blocks: [] };
   try {
     const saved = JSON.parse(readFileSync(file, 'utf8'));
     data = {
       reviews: Array.isArray(saved.reviews) ? saved.reviews : [],
-      bookings: Array.isArray(saved.bookings) ? saved.bookings : []
+      bookings: Array.isArray(saved.bookings) ? saved.bookings : [],
+      blocks: Array.isArray(saved.blocks) ? saved.blocks : []
     };
   } catch (err) {
     if (err.code !== 'ENOENT') throw new Error(`Could not read ${file}: ${err.message}`);
@@ -50,5 +51,5 @@ export function openStore(dir) {
     }
   });
 
-  return { file, reviews: collection('reviews'), bookings: collection('bookings') };
+  return { file, reviews: collection('reviews'), bookings: collection('bookings'), blocks: collection('blocks') };
 }

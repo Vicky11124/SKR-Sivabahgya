@@ -17,14 +17,16 @@ export default function Locations({
 }) {
   const ref = useRef(null);
   const list = venues.filter(v => v.id !== exclude);
+  const pair = list.length === 2;
 
   useGSAP(() => {
     if (reduceMotion) return;
+    // Each photo opens from its centre like a pair of doors, settling from a slight zoom
     gsap.timeline({ scrollTrigger: { trigger: '.places', start: 'top 82%' } })
       .fromTo('.place',
-        { clipPath: 'inset(100% 0% 0% 0%)' },
-        { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.6, stagger: 0.15, ease: 'expo.inOut' })
-      .from('.place__media', { scale: 1.25, duration: 2, stagger: 0.15, ease: 'expo.out' }, 0.2)
+        { clipPath: 'inset(0% 50% 0% 50%)' },
+        { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.5, stagger: 0.18, ease: 'expo.inOut' })
+      .from('.place__media', { scale: 1.3, filter: 'brightness(0.3)', duration: 2.2, stagger: 0.18, ease: 'expo.out' }, 0.15)
       .from('.place__num, .place__text', { opacity: 0, y: 30, duration: 1.2, stagger: 0.08, ease: 'expo.out' }, 0.9);
   }, { scope: ref });
 
@@ -37,11 +39,15 @@ export default function Locations({
         </div>
       )}
 
-      <div className={`places${list.length === 2 ? ' places--pair' : ''}`}>
+      <div className={`places${pair ? ' places--pair' : ''}`}>
         {list.map(v => (
           <SiteLink to={placePath(v.id)} className="place" key={v.id}>
             <span className="place__media">
-              <img src={v.cover.src} alt={v.cover.alt} loading="lazy" width="900" height="1125" />
+              {/* boxes turn landscape when there are two of them, and on smaller screens: use the wide photo there */}
+              <picture>
+                {pair ? null : <source media="(max-width: 960px)" srcSet={v.cover.wide} />}
+                <img src={pair ? v.cover.wide : v.cover.src} alt={v.cover.alt} loading="lazy" />
+              </picture>
             </span>
             <span className="place__num">{v.num}</span>
             <span className="place__text">

@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 import { useSite } from '../site';
 import { venues, rupees } from '../data/venues';
+import Availability from './Availability';
 import SiteLink from './SiteLink';
 import Gallery from './Gallery';
 import PlaceMap from './PlaceMap';
@@ -59,7 +60,7 @@ export default function Venue({ venue }) {
 
         <div className="venue__info">
           <p className="venue__desc">{venue.desc}</p>
-          {venue.notice && <p className="venue__notice"><i aria-hidden="true" />{venue.notice}</p>}
+          <Availability venue={venue} />
           <dl className="venue__stats">
             {venue.stats.map(([value, label]) => (
               <div key={label}><dt>{label}</dt><dd>{value}</dd></div>

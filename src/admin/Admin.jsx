@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { api } from '../lib/api';
-import { venues } from '../data/venues';
+import { venues, rupees } from '../data/venues';
+import { addDays, findUnit, freeByNight, nightsBetween, unitKey } from '../lib/stay';
 import { Stars } from '../components/Stars';
 import './admin.css';
 
@@ -90,6 +91,7 @@ function Login({ onSignedIn }) {
 function Dashboard({ user, onSignedOut }) {
   const [reviews, setReviews] = useState(null);
   const [bookings, setBookings] = useState(null);
+  const [blocks, setBlocks] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -103,9 +105,10 @@ function Dashboard({ user, onSignedOut }) {
     setLoading(true);
     setError('');
     try {
-      const [r, b] = await Promise.all([api('/admin/reviews'), api('/admin/bookings')]);
+      const [r, b, k] = await Promise.all([api('/admin/reviews'), api('/admin/bookings'), api('/admin/blocks')]);
       setReviews(r);
       setBookings(b);
+      setBlocks(k);
     } catch (err) {
       guard(err);
     } finally {
@@ -151,8 +154,24 @@ function Dashboard({ user, onSignedOut }) {
     }
   };
 
+  const addBlock = async block => {
+    const saved = await api('/admin/blocks', { method: 'POST', body: block }); // errors are shown by the form
+    setBlocks(list => [saved, ...list]);
+  };
+
+  const deleteBlock = async k => {
+    if (!confirm('Free these dates again? They become bookable on the website straight away.')) return;
+    try {
+      await api(`/admin/blocks/${k.id}`, { method: 'DELETE' });
+      setBlocks(list => list.filter(x => x.id !== k.id));
+    } catch (err) {
+      if (err.status === 404) setBlocks(list => list.filter(x => x.id !== k.id));
+      else guard(err);
+    }
+  };
+
   const fresh = bookings?.filter(b => b.status === 'new').length ?? 0;
-  const ready = reviews && bookings;
+  const ready = reviews && bookings && blocks;
 
   return (
     <div className="adm">
@@ -164,6 +183,7 @@ function Dashboard({ user, onSignedOut }) {
         <nav className="adm-tabs" aria-label="Dashboard sections">
           <NavLink to="/admin" end>Overview</NavLink>
           <NavLink to="/admin/bookings">Bookings{fresh > 0 && <b className="adm-badge">{fresh}</b>}</NavLink>
+          <NavLink to="/admin/availability">Availability</NavLink>
           <NavLink to="/admin/reviews">Reviews</NavLink>
         </nav>
         <div className="adm-top__end">
@@ -181,6 +201,7 @@ function Dashboard({ user, onSignedOut }) {
           <Routes>
             <Route index element={<Overview reviews={reviews} bookings={bookings} />} />
             <Route path="bookings" element={<Bookings bookings={bookings} onStatus={setStatus} onDelete={deleteBooking} />} />
+            <Route path="availability" element={<Availability bookings={bookings} blocks={blocks} onAdd={addBlock} onDelete={deleteBlock} onError={guard} />} />
             <Route path="reviews" element={<Reviews reviews={reviews} onDelete={deleteReview} />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
@@ -231,7 +252,7 @@ function Overview({ reviews, bookings }) {
                 <li key={b.id}>
                   <div>
                     <strong>{b.name}</strong> · <a href={`tel:${b.phone.replace(/[^\d+]/g, '')}`}>{b.phone}</a>
-                    <div className="adm-muted">{b.location} · {day(b.arrival)} → {day(b.departure)} · {b.guests} guest{b.guests === '1' ? '' : 's'}</div>
+                    <div className="adm-muted">{b.location}{b.roomName ? ` · ${b.roomName}` : ''} · {day(b.arrival)} → {day(b.departure)} · {b.guests} guest{String(b.guests) === '1' ? '' : 's'}</div>
                   </div>
                   <span className={`adm-pill adm-pill--${b.status}`}>{STATUS_LABEL[b.status]}</span>
                 </li>
@@ -281,9 +302,9 @@ function Bookings({ bookings, onStatus, onDelete }) {
   }, [bookings, status, location, query]);
 
   const exportCsv = () => {
-    const cols = ['Received', 'Name', 'Phone', 'Email', 'Location', 'Arrival', 'Departure', 'Nights', 'Guests', 'Status', 'Note'];
+    const cols = ['Received', 'Name', 'Phone', 'Email', 'Location', 'Floor', 'Room', 'Rooms', 'Arrival', 'Departure', 'Nights', 'Guests', 'Estimate (₹)', 'Status', 'Note'];
     const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const rows = shown.map(b => [b.createdAt, b.name, b.phone, b.email, b.location, b.arrival, b.departure, nights(b), b.guests, b.status, b.note]);
+    const rows = shown.map(b => [b.createdAt, b.name, b.phone, b.email, b.location, b.floorName, b.roomName, b.rooms, b.arrival, b.departure, nights(b), b.guests, b.estimate?.total, b.status, b.note]);
     const csv = '﻿' + [cols, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     Object.assign(document.createElement('a'), { href: url, download: `skr-bookings-${todayISO()}.csv` }).click();
@@ -314,7 +335,7 @@ function Bookings({ bookings, onStatus, onDelete }) {
           <table className="adm-table">
             <thead>
               <tr>
-                <th>Received</th><th>Guest</th><th>Location</th><th>Stay</th><th>Guests</th><th>Status</th><th><span className="sr-only">Actions</span></th>
+                <th>Received</th><th>Guest</th><th>Location &amp; room</th><th>Stay</th><th>Guests</th><th>Estimate</th><th>Status</th><th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -327,12 +348,16 @@ function Bookings({ bookings, onStatus, onDelete }) {
                     {b.email && <div><a href={`mailto:${b.email}`}>{b.email}</a></div>}
                     {b.note && <div className="adm-muted">{b.note}</div>}
                   </td>
-                  <td>{b.location}</td>
+                  <td>
+                    {b.location}
+                    {b.roomName && <div className="adm-muted">{b.roomName}{b.rooms > 1 ? ` × ${b.rooms}` : ''}{b.floorName ? ` · ${b.floorName}` : ''}</div>}
+                  </td>
                   <td className="adm-nowrap">
                     {day(b.arrival)} → {day(b.departure)}
                     <div className="adm-muted">{nights(b)} night{nights(b) === 1 ? '' : 's'}</div>
                   </td>
                   <td>{b.guests}</td>
+                  <td className="adm-nowrap">{b.estimate ? rupees(b.estimate.total) : '—'}</td>
                   <td>
                     <select
                       className={`adm-status adm-pill--${b.status}`}
@@ -352,6 +377,165 @@ function Bookings({ bookings, onStatus, onDelete }) {
       ) : (
         <p className="adm-empty">{bookings.length ? 'No bookings match these filters.' : 'No booking requests yet. They appear here as soon as a guest sends the reservation form.'}</p>
       )}
+    </>
+  );
+}
+
+/* ---------- Availability: mark dates booked (walk-ins, phone bookings, maintenance) ---------- */
+
+const MONTH_DAYS = 42;
+
+function Availability({ bookings, blocks, onAdd, onDelete }) {
+  const [placeId, setPlaceId] = useState(venues[0].id);
+  const venue = venues.find(v => v.id === placeId);
+  const units = venue.inventory.flatMap(f => venue.rooms.filter(r => f.rooms[r.id]).map(r => ({ floor: f, room: r, count: f.rooms[r.id] })));
+  const [unitId, setUnitId] = useState(unitKey(units[0].floor.id, units[0].room.id));
+  const unit = units.find(u => unitKey(u.floor.id, u.room.id) === unitId) ?? units[0];
+
+  const [arrival, setArrival] = useState('');
+  const [departure, setDeparture] = useState('');
+  const [rooms, setRooms] = useState(String(unit.count));
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const [monthStart, setMonthStart] = useState(() => todayISO().slice(0, 8) + '01');
+
+  const choosePlace = id => {
+    const v = venues.find(x => x.id === id);
+    const f = v.inventory[0];
+    const r = v.rooms.find(x => f.rooms[x.id]);
+    setPlaceId(id);
+    setUnitId(unitKey(f.id, r.id));
+    setRooms(String(f.rooms[r.id]));
+  };
+  const chooseUnit = id => {
+    setUnitId(id);
+    const u = units.find(x => unitKey(x.floor.id, x.room.id) === id);
+    setRooms(String(u.count));
+  };
+
+  // What takes rooms here: confirmed bookings and blocks (the same rule as the website)
+  const taken = useMemo(() => [
+    ...bookings.filter(b => b.place === placeId && b.status === 'confirmed' && b.room),
+    ...blocks.filter(b => b.place === placeId)
+  ], [bookings, blocks, placeId]);
+
+  const gridFrom = addDays(monthStart, -((new Date(`${monthStart}T00:00`).getDay() + 6) % 7));
+  const free = freeByNight(venue, taken, gridFrom, MONTH_DAYS)[unitKey(unit.floor.id, unit.room.id)];
+  const month = new Date(`${monthStart}T00:00`);
+  const shiftMonth = n => {
+    const d = new Date(month.getFullYear(), month.getMonth() + n, 1);
+    setMonthStart(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`);
+  };
+
+  const submit = async e => {
+    e.preventDefault();
+    setMsg('');
+    if (!arrival || !departure) return setMsg('Choose the first night and the check-out day.');
+    setBusy(true);
+    try {
+      await onAdd({ place: placeId, floor: unit.floor.id, room: unit.room.id, rooms: Number(rooms), arrival, departure, note });
+      setArrival(''); setDeparture(''); setNote('');
+      setMsg('Saved — these dates now show as booked on the website.');
+    } catch (err) {
+      setMsg(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const list = blocks
+    .filter(k => k.departure >= todayISO())
+    .sort((a, b) => a.arrival.localeCompare(b.arrival));
+
+  return (
+    <>
+      <div className="adm-head">
+        <h1 className="adm-h1">Availability</h1>
+      </div>
+      <p className="adm-muted adm-lead">
+        The website's booking calendar counts rooms as taken when a booking is <b>Confirmed</b>, or when you mark dates below
+        (phone or walk-in guests, maintenance). New requests don't take rooms until you confirm them.
+      </p>
+
+      <div className="adm-filters">
+        <select value={placeId} onChange={e => choosePlace(e.target.value)} aria-label="Place">
+          {venues.map(v => <option key={v.id} value={v.id}>{v.booking}</option>)}
+        </select>
+        <select value={unitId} onChange={e => chooseUnit(e.target.value)} aria-label="Floor and room">
+          {units.map(u => (
+            <option key={unitKey(u.floor.id, u.room.id)} value={unitKey(u.floor.id, u.room.id)}>
+              {u.floor.name} · {u.room.name} ({u.count})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="adm-cols">
+        <section className="adm-panel">
+          <div className="adm-panel__head">
+            <h2>{month.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</h2>
+            <div className="adm-avail-nav">
+              <button className="adm-btn" onClick={() => shiftMonth(-1)}>←</button>
+              <button className="adm-btn" onClick={() => shiftMonth(1)}>→</button>
+            </div>
+          </div>
+          <div className="adm-avail">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <span key={d} className="adm-avail__dow">{d}</span>)}
+            {free.map((n, i) => {
+              const date = addDays(gridFrom, i);
+              const out = date.slice(0, 7) !== monthStart.slice(0, 7);
+              const cls = n === 0 ? 'is-full' : n < unit.count ? 'is-some' : 'is-free';
+              return (
+                <span key={date} className={`adm-avail__day ${cls}${out ? ' is-out' : ''}`} title={`${day(date)}: ${n} of ${unit.count} free`}>
+                  <b>{Number(date.slice(8))}</b>
+                  <small>{n}/{unit.count}</small>
+                </span>
+              );
+            })}
+          </div>
+          <p className="adm-muted">Each day shows rooms free that night out of the total on this floor.</p>
+        </section>
+
+        <section className="adm-panel">
+          <div className="adm-panel__head"><h2>Mark dates as booked</h2></div>
+          <form className="adm-block-form" onSubmit={submit}>
+            <label className="adm-field"><span>First night</span><input type="date" value={arrival} min={addDays(todayISO(), -1)} onChange={e => setArrival(e.target.value)} /></label>
+            <label className="adm-field"><span>Check-out day</span><input type="date" value={departure} min={arrival || todayISO()} onChange={e => setDeparture(e.target.value)} /></label>
+            <label className="adm-field">
+              <span>Rooms</span>
+              <select value={rooms} onChange={e => setRooms(e.target.value)}>
+                {Array.from({ length: unit.count }, (_, i) => String(i + 1)).map(n => <option key={n} value={n}>{n}{n === String(unit.count) ? ' (all)' : ''}</option>)}
+              </select>
+            </label>
+            <label className="adm-field"><span>Note (optional)</span><input value={note} maxLength={200} onChange={e => setNote(e.target.value)} placeholder="e.g. Phone booking — Mr. Kumar" /></label>
+            <button className="adm-btn adm-btn--gold" disabled={busy}>{busy ? 'Saving…' : 'Mark as booked'}</button>
+            {msg && <p className="adm-muted" role="status">{msg}</p>}
+          </form>
+        </section>
+      </div>
+
+      <section className="adm-panel">
+        <div className="adm-panel__head"><h2>Marked dates ahead</h2></div>
+        {list.length ? (
+          <ul className="adm-mini">
+            {list.map(k => {
+              const v = venues.find(x => x.id === k.place);
+              const u = findUnit(v, k.floor, k.room);
+              return (
+                <li key={k.id}>
+                  <div>
+                    <strong>{v?.booking}</strong> · {u ? `${u.floor.name} · ${u.room.name}` : k.room} × {k.rooms}
+                    <div className="adm-muted">{day(k.arrival)} → {day(k.departure)} · {nightsBetween(k.arrival, k.departure)} night{nightsBetween(k.arrival, k.departure) === 1 ? '' : 's'}{k.note ? ` · ${k.note}` : ''}</div>
+                  </div>
+                  <button className="adm-btn adm-btn--danger" onClick={() => onDelete(k)}>Free dates</button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p className="adm-muted">No dates marked. Confirmed bookings already block their rooms automatically.</p>}
+      </section>
     </>
   );
 }

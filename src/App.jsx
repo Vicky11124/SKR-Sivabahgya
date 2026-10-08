@@ -8,6 +8,7 @@ import { labelFor } from './data/pages';
 
 import Nav from './components/Nav';
 import Lightbox from './components/Lightbox';
+import WhatsApp from './components/WhatsApp';
 import Home from './pages/Home';
 import About from './pages/About';
 import Places from './pages/Places';
@@ -53,6 +54,7 @@ function Site() {
   const [curtainLabel, setCurtainLabel] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [location, setLocation] = useState(venues[0].booking);
+  const [stay, setStay] = useState({}); // room and dates chosen in the booking form, for the WhatsApp message
   const [lightbox, setLightbox] = useState(null); // { venueId, index }
 
   /* Smooth scrolling, driven by GSAP's ticker so ScrollTrigger stays in sync */
@@ -165,9 +167,11 @@ function Site() {
     scrollToTarget,
     location,
     setLocation,
+    stay,
+    setStay,
     transitioning,
     openLightbox: (venueId, index) => setLightbox({ venueId, index })
-  }), [go, scrollToTarget, location, transitioning]);
+  }), [go, scrollToTarget, location, stay, transitioning]);
 
   const finishIntro = useCallback(() => {
     introPending.current = false;
@@ -189,6 +193,8 @@ function Site() {
         <Route path="/reviews" element={<Reviews />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      <WhatsApp />
 
       <Lightbox
         venue={lightboxVenue}
