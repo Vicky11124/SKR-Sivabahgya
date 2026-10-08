@@ -71,9 +71,14 @@ const DriftWall = ({
 
   const columnItems = useMemo(() => {
     const cols = Array.from({ length: columns }, () => []);
-    items.forEach((item, i) => cols[i % columns].push({ ...item, filler: false }));
-    // fewer items than columns: fill empty columns with repeats (marked so they stay decorative)
-    return cols.map(col => (col.length ? col : items.slice(0, 1).map(item => ({ ...item, filler: true }))));
+    if (!items.length) return cols;
+    // Deal at least four tiles to every column, cycling through the items when there are fewer
+    // than that; the repeats are marked so they stay decorative
+    const total = Math.max(items.length, columns * 4);
+    for (let i = 0; i < total; i++) {
+      cols[i % columns].push({ ...items[i % items.length], filler: i >= items.length });
+    }
+    return cols;
   }, [items, columns]);
 
   const columnMeta = useMemo(() => {

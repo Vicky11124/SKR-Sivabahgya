@@ -6,7 +6,6 @@ import { SiteContext } from './site';
 import { venues } from './data/venues';
 import { labelFor } from './data/pages';
 
-import Cursor from './components/Cursor';
 import Nav from './components/Nav';
 import Lightbox from './components/Lightbox';
 import Home from './pages/Home';
@@ -180,7 +179,6 @@ function Site() {
   return (
     <SiteContext.Provider value={site}>
       <div className="grain" aria-hidden="true" />
-      <Cursor />
       <Nav menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
 
       <Routes>

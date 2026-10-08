@@ -31,9 +31,13 @@ export default function Venue({ venue }) {
       clipPath: 'inset(0% 0% 0% 0%)', duration: 1.6, ease: 'expo.inOut',
       scrollTrigger: { trigger: '.map', start: 'top 85%' }
     });
-    gsap.from('.rate', {
-      opacity: 0, y: 30, duration: 1.2, stagger: 0.1, ease: 'expo.out',
+    gsap.from('.rates__head > *, .rate', {
+      opacity: 0, y: 30, duration: 1.2, stagger: 0.08, ease: 'expo.out',
       scrollTrigger: { trigger: '.rates', start: 'top 82%' }
+    });
+    gsap.from('.rate__dots', {
+      scaleX: 0, transformOrigin: 'left center', duration: 1.4, stagger: 0.1, ease: 'expo.inOut',
+      scrollTrigger: { trigger: '.rates', start: 'top 78%' }
     });
   }, { scope: ref });
 
@@ -97,18 +101,32 @@ export default function Venue({ venue }) {
         </div>
       </div>
 
-      {/* 3 — Rooms & rates */}
+      {/* 3 — Rooms & rates: a tariff card */}
       <div className="rates">
-        <p className="eyebrow">Rooms &amp; Rates</p>
-        <ol className="rates__list">
-          {venue.rooms.map(room => (
+        <div className="rates__head">
+          <p className="eyebrow">Rooms &amp; Rates</p>
+          <h2 className="rates__title">The <em>tariff.</em></h2>
+          <p className="rates__note">
+            Current rates at {venue.name}. Send a request below and our desk will call you to confirm availability.
+          </p>
+          <SiteLink to="#reserve" location={venue.booking} className="link-gold">Reserve a room</SiteLink>
+        </div>
+
+        <ol className="tariff">
+          {venue.rooms.map((room, i) => (
             <li className="rate" key={room.name}>
-              <span className="rate__name">{room.name}</span>
-              <span className="rate__note">{room.note}</span>
-              <span className="rate__price">
-                <b>{rupees(room.price)}</b>
-                <small>{room.unit}</small>
-              </span>
+              <span className="rate__num">{String(i + 1).padStart(2, '0')}</span>
+              <div className="rate__body">
+                <div className="rate__line">
+                  <span className="rate__name">{room.name}</span>
+                  <i className="rate__dots" aria-hidden="true" />
+                  <span className="rate__price">{rupees(room.price)}</span>
+                </div>
+                <div className="rate__sub">
+                  <span className="rate__note">{room.note}</span>
+                  <span className="rate__unit">{room.unit}</span>
+                </div>
+              </div>
             </li>
           ))}
         </ol>

@@ -88,7 +88,7 @@ export default function Reserve() {
             {['1', '2', '3', '4', '5+'].map(n => <option key={n}>{n}</option>)}
           </select>
         </label>
-        <button type="submit" className="btn-gold" data-magnetic disabled={sending}>
+        <button type="submit" className="btn-gold" disabled={sending}>
           <span>{sending ? 'Sending…' : 'Request booking'}</span>
         </button>
       </form>
