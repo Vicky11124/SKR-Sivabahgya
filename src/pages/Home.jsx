@@ -3,7 +3,7 @@ import Intro from '../components/Intro';
 import Stage from '../components/Stage';
 import Page from '../components/Page';
 import Motif from '../components/Motif';
-import Locations from '../components/Locations';
+import PlacesCarousel from '../components/PlacesCarousel';
 import Invite from '../components/Invite';
 import Reserve from '../components/Reserve';
 
@@ -17,7 +17,7 @@ export default function Home({ introPending, onIntroDone }) {
       <Stage />
       <Page hero>
         <Motif />
-        <Locations />
+        <PlacesCarousel />
         <Invite />
         <Reserve />
       </Page>

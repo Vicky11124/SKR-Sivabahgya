@@ -24,7 +24,7 @@ export const venues = [
     area: 'Kodaikanal · Vilpatti',
     type: 'Adventure Resort',
     booking: 'Kodaikanal',
-    cover: { src: '/assets/gallery/kodaikanal/cover.webp', wide: '/assets/gallery/kodaikanal/cover-wide.webp', alt: 'Dining room at the Kodaikanal resort with a wide view of the hills' },
+    cover: { src: '/assets/gallery/kodaikanal/cover.webp', wide: '/assets/gallery/kodaikanal/cover-wide.webp', alt: 'Aerial view of the Kodaikanal resort on a wooded hilltop, with the Palani Hills and clouds beyond' },
     desc: 'High in the Palani Hills at Vilpatti, the resort looks out over eucalyptus forest and drifting mist. Rooms open to the valley, the dining hall frames the mountains, and the lawns invite slow, cool mornings.',
     stats: [['10', 'Rooms'], ['G + 2', 'Floors'], ['₹6,000', 'Rooms from']],
     facts: [

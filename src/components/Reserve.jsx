@@ -10,7 +10,6 @@ import { whatsappLink } from '../lib/whatsapp';
 import Lines from './Lines';
 import Calendar from './Calendar';
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
 const fmt = v => new Date(v + 'T00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 const fmtLong = v => new Date(v + 'T00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -32,23 +31,6 @@ function Stepper({ label, note, value, min, max, onChange }) {
   );
 }
 
-/* One chapter of the reservation: a header that shows the choice made, and a body that opens when active */
-function Step({ n, title, value, open, done, onOpen, children }) {
-  return (
-    <section className={`rv-step${open ? ' is-open' : ''}${done ? ' is-done' : ''}`}>
-      <button type="button" className="rv-step__head" onClick={onOpen} aria-expanded={open}>
-        <span className="rv-step__num">{n}</span>
-        <span className="rv-step__title">{title}</span>
-        <span className="rv-step__value">{value}</span>
-        <span className="rv-step__edit" aria-hidden="true">{open ? '' : done ? 'Change' : ''}</span>
-      </button>
-      <div className="rv-step__body" inert={!open}>
-        <div className="rv-step__inner">{children}</div>
-      </div>
-    </section>
-  );
-}
-
 export default function Reserve() {
   const ref = useRef(null);
   const route = useLocation();
@@ -65,9 +47,9 @@ export default function Reserve() {
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [avail, setAvail] = useState(null); // { from, free } for the current place
-  // On a place's own page the place is already chosen, so start one step in
-  const [open, setOpen] = useState(() => (route.pathname.startsWith('/places/') ? (multiFloor ? 'floor' : 'room') : 'place'));
+  const [availAll, setAvailAll] = useState({}); // place id → { from, free } (or { error })
+  // Dates come first everywhere; on a place's own page the place is already chosen too
+  const [open, setOpen] = useState('dates');
   const [touched, setTouched] = useState(() => new Set(route.pathname.startsWith('/places/') ? ['place'] : []));
 
   // A new place starts on its first floor and room type
@@ -79,16 +61,14 @@ export default function Reserve() {
     setGuests(g => Math.min(g, venue.rooms[0].sleeps));
   }, [venue]);
 
-  // Only the latest request may set the data, so a slow answer for a previous place can't overwrite it
-  const latest = useRef(0);
-  const loadAvailability = (fresh = false) => {
-    const ticket = ++latest.current;
-    setAvail(null);
-    fetchAvailability(venue.id, { fresh })
-      .then(data => ticket === latest.current && setAvail(data))
-      .catch(() => ticket === latest.current && setAvail({ error: true }));
+  // Availability for every place, so once the dates are known each place can say what it has free
+  const loadAvailability = (id, fresh = false) => {
+    fetchAvailability(id, { fresh })
+      .then(data => setAvailAll(a => ({ ...a, [id]: data })))
+      .catch(() => setAvailAll(a => ({ ...a, [id]: { error: true } })));
   };
-  useEffect(() => { loadAvailability(); }, [venue.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { venues.forEach(v => loadAvailability(v.id)); }, []);
+  const avail = availAll[venue.id] ?? null;
 
   const floor = venue.inventory.find(f => f.id === floorId) ?? venue.inventory[0];
   const room = venue.rooms.find(r => r.id === roomId && floor.rooms[r.id]) ?? venue.rooms.find(r => floor.rooms[r.id]);
@@ -96,15 +76,19 @@ export default function Reserve() {
   const { arrival, departure } = dates;
   const nights = arrival && departure ? nightsBetween(arrival, departure) : 0;
   const from = avail?.from ?? todayIST();
-  const free = avail?.free?.[unitKey(floor.id, room.id)] ?? null;
   const nightWord = venue.id === 'kochadai' ? 'day' : 'night';
 
-  // How many of this room are free for the chosen dates (all of them until dates are picked)
-  const freeFor = (fId, rId) => {
-    const total = venue.inventory.find(f => f.id === fId).rooms[rId];
-    if (!nights || !avail?.free) return total;
-    return freeForStay(avail.free[unitKey(fId, rId)], from, arrival, departure);
+  // How many of a room are free for the chosen dates (all of them until dates are picked)
+  const freeAt = (v, fId, rId) => {
+    const total = v.inventory.find(f => f.id === fId).rooms[rId];
+    const a = availAll[v.id];
+    if (!nights || !a?.free) return total;
+    return freeForStay(a.free[unitKey(fId, rId)], a.from, arrival, departure);
   };
+  const freeFor = (fId, rId) => freeAt(venue, fId, rId);
+  const freeOnFloor = (v, f) => Object.keys(f.rooms).reduce((sum, rId) => sum + freeAt(v, f.id, rId), 0);
+  const freeInPlace = v => v.inventory.reduce((sum, f) => sum + freeOnFloor(v, f), 0);
+  const known = v => nights > 0 && !!availAll[v.id]?.free; // free counts are real, not just totals
   const left = freeFor(floor.id, room.id);
   const maxRooms = Math.max(1, Math.min(count, left || count));
   const fits = rooms * room.sleeps >= guests;
@@ -138,8 +122,13 @@ export default function Reserve() {
   const chooseDates = d => {
     setDates(d);
     setMessage('');
-    if (d.arrival && d.departure) go('dates', 'guest');
+    if (d.arrival && d.departure) go('dates', touched.has('place') ? (multiFloor ? 'floor' : 'room') : 'place');
   };
+
+  // Calendar on the dates step: once the place is settled, nights when it is completely full are closed
+  const calendarFree = touched.has('place') && avail?.free && Object.keys(avail.free).length
+    ? Object.values(avail.free).reduce((sum, perNight) => sum.map((x, i) => x + (perNight[i] ?? 0)))
+    : null;
 
   // Shared with the floating WhatsApp button, so its message carries this stay
   useEffect(() => {
@@ -152,7 +141,7 @@ export default function Reserve() {
       .fromTo('.rv', { clipPath: 'inset(0% 50% 0% 50%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.6, ease: 'expo.inOut' })
       .from('.rv__photos', { scale: 1.2, duration: 2.2, ease: 'expo.out' }, 0.2)
       .from('.rv__visual-head > *, .rv-folio', { opacity: 0, y: 24, duration: 1.2, stagger: 0.08, ease: 'expo.out' }, 0.8)
-      .from('.rv-step', { opacity: 0, x: 30, duration: 1.1, stagger: 0.07, ease: 'expo.out' }, 0.7);
+      .from('.rv-rail, .rv-pane, .rv-nav', { opacity: 0, x: 30, duration: 1.1, stagger: 0.08, ease: 'expo.out' }, 0.7);
     gsap.from('.reserve__glow', {
       opacity: 0, scale: 0.7, ease: 'none',
       scrollTrigger: { trigger: ref.current, start: 'top bottom', end: 'center center', scrub: true }
@@ -164,7 +153,7 @@ export default function Reserve() {
     e.preventDefault();
     if (sending) return;
     if (!arrival || !departure) { setOpen('dates'); return setMessage('Kindly choose your arrival and departure days.'); }
-    if (left < rooms) { setOpen('dates'); return setMessage('This room is not free for all of those nights. Try other dates or another floor.'); }
+    if (left < rooms) { setOpen('room'); return setMessage('This room is not free for all of those nights. Try another room, floor or dates.'); }
     if (!fits) { setOpen('room'); return setMessage(`${room.name} sleeps ${room.sleeps} — kindly add a room for ${guests} guests.`); }
     if (!name.trim()) return setMessage('Kindly add your name.');
     if ((phone.match(/\d/g) || []).length < 7) return setMessage('Kindly add a phone number we can reach you on.');
@@ -180,7 +169,7 @@ export default function Reserve() {
       setName(''); setPhone(''); setDates({ arrival: '', departure: '' });
     } catch (err) {
       setMessage(err.message);
-      if (err.status === 409) { loadAvailability(true); setOpen('dates'); }
+      if (err.status === 409) { loadAvailability(venue.id, true); setOpen('room'); }
     } finally {
       setSending(false);
     }
@@ -190,14 +179,29 @@ export default function Reserve() {
   const fromPrice = f => Math.min(...venue.rooms.filter(r => f.rooms[r.id]).map(r => r.price));
 
   const steps = [
-    { id: 'place', title: 'The place', value: venue.name },
-    multiFloor && { id: 'floor', title: 'The floor', value: floor.name },
-    { id: 'room', title: multiFloor ? 'The room' : 'The stay', value: `${room.name} · ${plural(guests, 'guest')}` },
-    { id: 'dates', title: 'The dates', value: nights ? `${fmt(arrival)} – ${fmt(departure)}` : '' },
-    { id: 'guest', title: 'Your details', value: name.trim() }
+    { id: 'dates', title: 'The dates', ask: 'When will you arrive, and when will you leave?', value: nights ? `${fmt(arrival)} – ${fmt(departure)}` : '' },
+    { id: 'place', title: 'The place', ask: nights ? `Rooms free for ${fmt(arrival)} – ${fmt(departure)}.` : 'Where would you like to stay?', value: venue.name },
+    multiFloor && { id: 'floor', title: 'The floor', ask: nights ? 'Free rooms on each floor for your dates.' : 'Choose a floor of the house.', value: floor.name },
+    { id: 'room', title: multiFloor ? 'The room' : 'The stay', ask: nights ? 'Rooms free for your dates — pick one and who is coming.' : 'Pick your room and who is coming.', value: `${room.name} · ${plural(guests, 'guest')}` },
+    { id: 'guest', title: 'Your details', ask: 'Where can our desk reach you?', value: name.trim() }
   ].filter(Boolean);
   // a place without floors has no floor step: open the room instead
   const current = open === 'floor' && !multiFloor ? 'room' : open;
+  const at = steps.findIndex(s => s.id === current);
+  const step = steps[at];
+  const isDone = s => touched.has(s.id) || (s.id === 'dates' && nights > 0);
+
+  // What has to be settled before moving on from each step
+  const blocker = {
+    dates: !nights && 'Choose your arrival and departure days.',
+    room: (left < rooms && `${room.name} is not free for all these nights — pick another room, floor or dates.`)
+      || (!fits && `${room.name} sleeps ${room.sleeps} — add a room for ${plural(guests, 'guest')}.`)
+  }[current];
+  const next = () => {
+    if (blocker) return setMessage(blocker);
+    if (at < steps.length - 1) go(current, steps[at + 1].id);
+  };
+  const prev = () => { if (at > 0) { setOpen(steps[at - 1].id); setMessage(''); } };
 
   const body = id => {
     if (id === 'place') return (
@@ -209,6 +213,7 @@ export default function Reserve() {
               <small>{v.type}</small>
               <b>{v.name}</b>
               <em>from {rupees(Math.min(...v.rooms.map(r => r.price)))}</em>
+              {known(v) && <span className={`rv-place__free${freeInPlace(v) ? '' : ' is-none'}`}>{freeInPlace(v) ? `${plural(freeInPlace(v), 'room')} free` : 'Fully booked'}</span>}
             </span>
           </button>
         ))}
@@ -226,7 +231,7 @@ export default function Reserve() {
                 <span className="rv-floors__name">{f.name}</span>
                 <span className="rv-floors__types">{venue.rooms.filter(r => f.rooms[r.id]).map(r => r.name).join(' · ')}</span>
                 <i aria-hidden="true" />
-                <span className="rv-floors__meta">{plural(total, 'room')} · from {rupees(fromPrice(f))}</span>
+                <span className="rv-floors__meta">{known(venue) ? `${freeOnFloor(venue, f)} of ${total} free` : plural(total, 'room')} · from {rupees(fromPrice(f))}</span>
               </button>
             </li>
           );
@@ -261,19 +266,18 @@ export default function Reserve() {
             );
           })}
         </div>
+        {nights > 0 && left < rooms && <p className="rv-warn">{room.name} is not free for all these nights — pick another room or floor.</p>}
         <div className="rv-counts">
           <Stepper label="Guests" note={`${room.name} sleeps ${room.sleeps}`} value={guests} min={1} max={maxRooms * room.sleeps} onChange={changeGuests} />
           {count > 1 && <Stepper label="Rooms" note={`${count} on this floor`} value={rooms} min={Math.ceil(guests / room.sleeps)} max={maxRooms} onChange={n => setRooms(Math.max(1, Math.min(n, maxRooms)))} />}
         </div>
-        <button type="button" className="rv-next" onClick={() => go('room', 'dates')}>Continue to dates <i aria-hidden="true">→</i></button>
       </>
     );
 
     if (id === 'dates') return (
       <>
         {avail?.error && <p className="rv-note">Live availability could not be loaded — you can still send a request and the desk will confirm.</p>}
-        <Calendar from={from} free={free} need={rooms} arrival={arrival} departure={departure} onChange={chooseDates} />
-        {nights > 0 && left < rooms && <p className="rv-warn">Not free for all these nights — try other dates or another floor.</p>}
+        <Calendar from={calendarFree ? from : todayIST()} free={calendarFree} need={1} arrival={arrival} departure={departure} onChange={chooseDates} />
       </>
     );
 
@@ -301,6 +305,16 @@ export default function Reserve() {
       </div>
     );
   };
+
+  // Each new step slides in from the side it was reached from
+  const lastAt = useRef(at);
+  useGSAP(() => {
+    const dir = Math.sign(at - lastAt.current);
+    lastAt.current = at;
+    if (reduceMotion || !dir) return;
+    gsap.fromTo('.rv-pane', { opacity: 0, x: dir * 48 }, { opacity: 1, x: 0, duration: 0.8, ease: 'expo.out' });
+    gsap.fromTo('.rv-rail__fill', { scaleX: (at - dir) / (steps.length - 1) }, { scaleX: at / (steps.length - 1), duration: 0.9, ease: 'expo.inOut' });
+  }, { scope: ref, dependencies: [at], revertOnUpdate: false });
 
   return (
     <section className="reserve" id="reserve" ref={ref}>
@@ -338,22 +352,50 @@ export default function Reserve() {
           </div>
         </aside>
 
-        {/* The reservation, chapter by chapter */}
+        {/* The reservation, one step at a time */}
         <div className="rv__flow">
-          {steps.map((s, i) => (
-            <Step
-              key={s.id}
-              n={ROMAN[i]}
-              title={s.title}
-              value={s.value}
-              open={current === s.id}
-              done={touched.has(s.id) || (s.id === 'dates' && nights > 0)}
-              onOpen={() => setOpen(s.id)}
-            >
-              {body(s.id)}
-            </Step>
-          ))}
+          <ol className="rv-rail" style={{ '--steps': steps.length }}>
+            <span className="rv-rail__track" aria-hidden="true">
+              <span className="rv-rail__fill" style={{ transform: `scaleX(${at / (steps.length - 1)})` }} />
+            </span>
+            {steps.map((s, i) => {
+              const reachable = i <= at || isDone(s) || isDone(steps[i - 1] ?? s);
+              return (
+                <li key={s.id} className={[i === at && 'is-on', i < at && 'is-past', isDone(s) && 'is-done'].filter(Boolean).join(' ')}>
+                  <button type="button" onClick={() => { setOpen(s.id); setMessage(''); }} disabled={!reachable} aria-current={i === at ? 'step' : undefined}>
+                    <span className="rv-rail__dot" aria-hidden="true" />
+                    <span className="rv-rail__label">{s.title}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="rv-pane" key={current}>
+            <header className="rv-pane__head">
+              <h3 className="rv-pane__title">{step.title}</h3>
+              <p className="rv-pane__ask">{step.ask}</p>
+            </header>
+            <div className="rv-pane__body">{body(current)}</div>
+          </div>
+
           <p className="booking__msg" role="status" aria-live="polite">{message}</p>
+
+          <nav className="rv-nav" aria-label="Booking steps">
+            <button type="button" className="rv-nav__btn rv-nav__btn--prev" onClick={prev} disabled={at === 0}>
+              <i aria-hidden="true">←</i> Previous
+            </button>
+            <span className="rv-nav__dots" aria-hidden="true">
+              {steps.map((s, i) => <i key={s.id} className={i === at ? 'is-on' : i < at ? 'is-past' : undefined} />)}
+            </span>
+            {at < steps.length - 1 ? (
+              <button type="button" className="rv-nav__btn rv-nav__btn--next" onClick={next}>
+                Next<span className="rv-nav__to"> · {steps[at + 1].title}</span> <i aria-hidden="true">→</i>
+              </button>
+            ) : (
+              <span className="rv-nav__end">Last step</span>
+            )}
+          </nav>
         </div>
       </form>
     </section>

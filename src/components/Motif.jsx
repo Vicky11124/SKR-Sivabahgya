@@ -1,31 +1,31 @@
 import { useRef } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 
-/* Stepped gold lines from the lobby wall, drawn in as you scroll and meeting at the crest */
+/*
+  Stepped gold lines from the lobby wall. One runs in from the left edge and one from the
+  right; both are tied to the scroll position and meet in the middle as the band reaches
+  the centre of the screen (scrolling back up draws them apart again).
+*/
 export default function Motif() {
   const ref = useRef(null);
 
   useGSAP(() => {
     if (reduceMotion) return;
     gsap.set('path', { strokeDasharray: 1, strokeDashoffset: 1 });
-    gsap.timeline({
-      scrollTrigger: { trigger: ref.current, start: 'top 85%', end: 'bottom 35%', scrub: 1 }
-    })
-      .to('path:not(.motif__center)', { strokeDashoffset: 0, ease: 'none', duration: 1 })
-      .to('.motif__center', { opacity: 1, strokeDashoffset: 0, ease: 'none', duration: 0.4 })
-      .from('.motif__crown', { opacity: 0, scale: 0.6, duration: 0.4, ease: 'power2.out' }, '-=0.3');
+    // each path is normalised to length 1, so both reach the meeting point at the same moment
+    gsap.to('path', {
+      strokeDashoffset: 0,
+      ease: 'none',
+      scrollTrigger: { trigger: ref.current, start: 'top 95%', end: 'center 50%', scrub: 0.6 }
+    });
   }, { scope: ref });
 
   return (
     <div className="motif" ref={ref} aria-hidden="true">
       <svg viewBox="0 0 1600 220" preserveAspectRatio="xMidYMid meet">
-        <path pathLength="1" d="M0 150 H360 V90 H620 V40 H760" />
-        <path pathLength="1" d="M1600 70 H1240 V130 H980 V180 H840" />
-        <path pathLength="1" d="M760 40 H840 V180" className="motif__center" />
+        <path pathLength="1" d="M0 150 H360 V90 H620 V40 H840 V110" />
+        <path pathLength="1" d="M1600 70 H1240 V130 H980 V180 H840 V110" />
       </svg>
-      <span className="motif__crown">
-        <img src="/assets/logo-crest-sm.webp" alt="" />
-      </span>
     </div>
   );
 }
