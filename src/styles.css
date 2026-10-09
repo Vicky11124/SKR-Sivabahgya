@@ -422,22 +422,6 @@ main { position: relative; z-index: 2; pointer-events: none; }
   color: var(--faint);
   z-index: 1;
 }
-.hero__scroll {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 1px;
-  height: 64px;
-  background: rgba(212, 166, 74, 0.2);
-  overflow: hidden;
-}
-.hero__scroll i {
-  position: absolute;
-  inset: 0;
-  background: var(--gold);
-  animation: drip 2.2s var(--ease) infinite;
-}
 @keyframes drip {
   0% { transform: translateY(-100%); }
   60%, 100% { transform: translateY(100%); }
@@ -2790,5 +2774,5 @@ main { position: relative; z-index: 2; pointer-events: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .grain, .hero__shine, .hero__scroll i { animation: none; }
+  .grain, .hero__shine { animation: none; }
 }

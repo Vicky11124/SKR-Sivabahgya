@@ -54,6 +54,9 @@ export default function Reserve() {
   const [datesOpen, setDatesOpen] = useState(false); // the date drop-down above the steps
   const datesRef = useRef(null);
   const [touched, setTouched] = useState(() => new Set(route.pathname.startsWith('/places/') ? ['place'] : []));
+  // Floor and room stay blank until the guest picks them (a one-floor place has its floor settled)
+  const [roomPicked, setRoomPicked] = useState(false);
+  const floorPicked = !multiFloor || touched.has('floor');
 
   // A new place starts on its first floor and room type
   useEffect(() => {
@@ -62,6 +65,8 @@ export default function Reserve() {
     setRoomId(Object.keys(floor.rooms)[0]);
     setRooms(1);
     setGuests(g => Math.min(g, venue.rooms[0].sleeps));
+    setRoomPicked(false);
+    setTouched(t => { const n = new Set(t); n.delete('floor'); n.delete('room'); return n; });
   }, [venue]);
 
   // Availability for every place, so once the dates are known each place can say what it has free
@@ -95,7 +100,7 @@ export default function Reserve() {
   const left = freeFor(floor.id, room.id);
   const maxRooms = Math.max(1, Math.min(count, left || count));
   const fits = rooms * room.sleeps >= guests;
-  const price = nights ? quote(room.price, rooms, nights) : null;
+  const price = nights && roomPicked ? quote(room.price, rooms, nights) : null;
   const gstPct = Math.round((price?.gstRate ?? (room.price <= 7500 ? 0.05 : 0.18)) * 100);
 
   // Keep the counts sensible when the room or dates change
@@ -119,7 +124,7 @@ export default function Reserve() {
   };
   const chooseFloor = f => {
     setFloorId(f.id);
-    if (!f.rooms[roomId]) setRoomId(Object.keys(f.rooms)[0]);
+    if (!f.rooms[roomId]) { setRoomId(Object.keys(f.rooms)[0]); setRoomPicked(false); }
     go('floor', 'room');
   };
   const chooseDates = d => {
@@ -145,8 +150,8 @@ export default function Reserve() {
 
   // Shared with the floating WhatsApp button, so its message carries this stay
   useEffect(() => {
-    setStay({ location: venue.booking, floorName: multiFloor ? floor.name : '', roomName: room.name, arrival, departure, guests });
-  }, [venue, multiFloor, floor, room, arrival, departure, guests, setStay]);
+    setStay({ location: venue.booking, floorName: multiFloor && floorPicked ? floor.name : '', roomName: roomPicked ? room.name : '', arrival, departure, guests });
+  }, [venue, multiFloor, floor, room, floorPicked, roomPicked, arrival, departure, guests, setStay]);
 
   useGSAP(() => {
     if (reduceMotion) return;
@@ -166,6 +171,8 @@ export default function Reserve() {
     e.preventDefault();
     if (sending) return;
     if (!arrival || !departure) { setDatesOpen(true); return setMessage('Kindly choose your arrival and departure days.'); }
+    if (!floorPicked) { setOpen('floor'); return setMessage('Kindly choose a floor.'); }
+    if (!roomPicked) { setOpen('room'); return setMessage('Kindly choose a room.'); }
     if (left < rooms) { setOpen('room'); return setMessage('This room is not free for all of those nights. Try another room, floor or dates.'); }
     if (!fits) { setOpen('room'); return setMessage(`${room.name} sleeps ${room.sleeps} — kindly add a room for ${guests} guests.`); }
     if (!name.trim()) return setMessage('Kindly add your name.');
@@ -204,7 +211,9 @@ export default function Reserve() {
 
   // What has to be settled before moving on from each step
   const blocker = {
+    floor: !floorPicked && 'Choose a floor.',
     room: (!nights && 'Choose your arrival and departure days above.')
+      || (!roomPicked && 'Choose a room.')
       || (left < rooms && `${room.name} is not free for all these nights — pick another room, floor or dates.`)
       || (!fits && `${room.name} sleeps ${room.sleeps} — add a room for ${plural(guests, 'guest')}.`)
   }[current];
@@ -238,7 +247,7 @@ export default function Reserve() {
           const total = Object.values(f.rooms).reduce((a, b) => a + b, 0);
           return (
             <li key={f.id}>
-              <button type="button" className={f.id === floor.id ? 'is-on' : undefined} aria-pressed={f.id === floor.id} onClick={() => chooseFloor(f)}>
+              <button type="button" className={floorPicked && f.id === floor.id ? 'is-on' : undefined} aria-pressed={floorPicked && f.id === floor.id} onClick={() => chooseFloor(f)}>
                 <span className="rv-floors__name">{f.name}</span>
                 <span className="rv-floors__types">{venue.rooms.filter(r => f.rooms[r.id]).map(r => r.name).join(' · ')}</span>
                 <i aria-hidden="true" />
@@ -260,9 +269,9 @@ export default function Reserve() {
               <button
                 type="button"
                 key={r.id}
-                className={['rv-room', r.id === room.id && 'is-on', full && 'is-full'].filter(Boolean).join(' ')}
-                aria-pressed={r.id === room.id}
-                onClick={() => { setRoomId(r.id); setMessage(''); }}
+                className={['rv-room', roomPicked && r.id === room.id && 'is-on', full && 'is-full'].filter(Boolean).join(' ')}
+                aria-pressed={roomPicked && r.id === room.id}
+                onClick={() => { setRoomId(r.id); setRoomPicked(true); setMessage(''); }}
               >
                 <span className="rv-room__name">{r.name}</span>
                 <span className="rv-room__note">{r.note}</span>
@@ -301,7 +310,7 @@ export default function Reserve() {
           <button type="submit" className="btn-gold" disabled={sending}>
             <span>{sending ? 'Sending…' : price ? `Request booking · ${rupees(price.total)}` : 'Request booking'}</span>
           </button>
-          <a className="rv-wa" target="_blank" rel="noopener" href={whatsappLink({ location: venue.booking, floorName: multiFloor ? floor.name : '', roomName: room.name, arrival, departure, guests })}>
+          <a className="rv-wa" target="_blank" rel="noopener" href={whatsappLink({ location: venue.booking, floorName: multiFloor && floorPicked ? floor.name : '', roomName: roomPicked ? room.name : '', arrival, departure, guests })}>
             or reserve on WhatsApp
           </a>
         </div>
@@ -338,19 +347,19 @@ export default function Reserve() {
           </div>
 
           <div className="rv-folio" aria-live="polite">
-            <div className="rv-folio__row"><span>Room</span><i /><b>{room.name}{rooms > 1 ? ` × ${rooms}` : ''}</b></div>
-            {multiFloor && <div className="rv-folio__row"><span>Floor</span><i /><b>{floor.name}</b></div>}
+            <div className="rv-folio__row"><span>Room</span><i /><b>{roomPicked ? `${room.name}${rooms > 1 ? ` × ${rooms}` : ''}` : '—'}</b></div>
+            {multiFloor && <div className="rv-folio__row"><span>Floor</span><i /><b>{floorPicked ? floor.name : '—'}</b></div>}
             <div className="rv-folio__row"><span>Arrival</span><i /><b>{arrival ? fmtLong(arrival) : '—'}</b></div>
             <div className="rv-folio__row"><span>Departure</span><i /><b>{departure ? fmtLong(departure) : '—'}</b></div>
             <div className="rv-folio__row"><span>Guests</span><i /><b>{guests}</b></div>
             <div className="rv-folio__rule" />
             <div className="rv-folio__row rv-folio__row--sm">
-              <span>{rupees(room.price)} × {nights ? plural(nights, nightWord) : `per ${nightWord}`}{rooms > 1 ? ` × ${rooms}` : ''}</span><i /><b>{price ? rupees(price.subtotal) : '—'}</b>
+              <span>{roomPicked ? `${rupees(room.price)} × ${nights ? plural(nights, nightWord) : `per ${nightWord}`}${rooms > 1 ? ` × ${rooms}` : ''}` : 'Room rate'}</span><i /><b>{price ? rupees(price.subtotal) : '—'}</b>
             </div>
-            <div className="rv-folio__row rv-folio__row--sm"><span>GST {gstPct}%</span><i /><b>{price ? rupees(price.gst) : '—'}</b></div>
+            <div className="rv-folio__row rv-folio__row--sm"><span>{roomPicked ? `GST ${gstPct}%` : 'GST'}</span><i /><b>{price ? rupees(price.gst) : '—'}</b></div>
             <div className="rv-folio__total">
               <span>Estimated total</span>
-              <b className={price ? undefined : 'is-empty'}>{price ? rupees(price.total) : 'Select your dates'}</b>
+              <b className={price ? undefined : 'is-empty'}>{price ? rupees(price.total) : !nights ? 'Select your dates' : 'Select your room'}</b>
             </div>
           </div>
         </aside>

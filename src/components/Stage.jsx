@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import { gsap, useGSAP, reduceMotion, finePointer } from '../motion';
-import SiteLink from './SiteLink';
 
 const NAME = 'SIVABHAGYA';
 
@@ -91,7 +90,6 @@ export default function Stage() {
 
       <div className="hero__foot">
         <span>Hotels &amp; Resorts</span>
-        <SiteLink to="#locations" className="hero__scroll" aria-label="Scroll to our places"><i /></SiteLink>
         <span>Scroll to enter</span>
       </div>
     </div>
