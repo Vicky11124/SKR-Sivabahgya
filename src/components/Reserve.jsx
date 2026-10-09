@@ -49,7 +49,10 @@ export default function Reserve() {
   const [sending, setSending] = useState(false);
   const [availAll, setAvailAll] = useState({}); // place id → { from, free } (or { error })
   // Dates come first everywhere; on a place's own page the place is already chosen too
-  const [open, setOpen] = useState('dates');
+  // On a place's own page the place is already chosen, so start one step in
+  const [open, setOpen] = useState(() => (route.pathname.startsWith('/places/') ? (multiFloor ? 'floor' : 'room') : 'place'));
+  const [datesOpen, setDatesOpen] = useState(false); // the date drop-down above the steps
+  const datesRef = useRef(null);
   const [touched, setTouched] = useState(() => new Set(route.pathname.startsWith('/places/') ? ['place'] : []));
 
   // A new place starts on its first floor and room type
@@ -122,10 +125,20 @@ export default function Reserve() {
   const chooseDates = d => {
     setDates(d);
     setMessage('');
-    if (d.arrival && d.departure) go('dates', touched.has('place') ? (multiFloor ? 'floor' : 'room') : 'place');
+    if (d.arrival && d.departure) setDatesOpen(false);
   };
 
-  // Calendar on the dates step: once the place is settled, nights when it is completely full are closed
+  // The date drop-down closes on a click outside it or on Escape
+  useEffect(() => {
+    if (!datesOpen) return;
+    const onDown = e => { if (!datesRef.current?.contains(e.target)) setDatesOpen(false); };
+    const onKey = e => { if (e.key === 'Escape') setDatesOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [datesOpen]);
+
+  // Calendar: once the place is settled, nights when it is completely full are closed
   const calendarFree = touched.has('place') && avail?.free && Object.keys(avail.free).length
     ? Object.values(avail.free).reduce((sum, perNight) => sum.map((x, i) => x + (perNight[i] ?? 0)))
     : null;
@@ -141,7 +154,7 @@ export default function Reserve() {
       .fromTo('.rv', { clipPath: 'inset(0% 50% 0% 50%)' }, { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.6, ease: 'expo.inOut' })
       .from('.rv__photos', { scale: 1.2, duration: 2.2, ease: 'expo.out' }, 0.2)
       .from('.rv__visual-head > *, .rv-folio', { opacity: 0, y: 24, duration: 1.2, stagger: 0.08, ease: 'expo.out' }, 0.8)
-      .from('.rv-rail, .rv-pane, .rv-nav', { opacity: 0, x: 30, duration: 1.1, stagger: 0.08, ease: 'expo.out' }, 0.7);
+      .from('.rv-pane, .rv-nav', { opacity: 0, x: 30, duration: 1.1, stagger: 0.08, ease: 'expo.out' }, 0.7);
     gsap.from('.reserve__glow', {
       opacity: 0, scale: 0.7, ease: 'none',
       scrollTrigger: { trigger: ref.current, start: 'top bottom', end: 'center center', scrub: true }
@@ -152,7 +165,7 @@ export default function Reserve() {
   const submit = async e => {
     e.preventDefault();
     if (sending) return;
-    if (!arrival || !departure) { setOpen('dates'); return setMessage('Kindly choose your arrival and departure days.'); }
+    if (!arrival || !departure) { setDatesOpen(true); return setMessage('Kindly choose your arrival and departure days.'); }
     if (left < rooms) { setOpen('room'); return setMessage('This room is not free for all of those nights. Try another room, floor or dates.'); }
     if (!fits) { setOpen('room'); return setMessage(`${room.name} sleeps ${room.sleeps} — kindly add a room for ${guests} guests.`); }
     if (!name.trim()) return setMessage('Kindly add your name.');
@@ -179,7 +192,6 @@ export default function Reserve() {
   const fromPrice = f => Math.min(...venue.rooms.filter(r => f.rooms[r.id]).map(r => r.price));
 
   const steps = [
-    { id: 'dates', title: 'The dates', ask: 'When will you arrive, and when will you leave?', value: nights ? `${fmt(arrival)} – ${fmt(departure)}` : '' },
     { id: 'place', title: 'The place', ask: nights ? `Rooms free for ${fmt(arrival)} – ${fmt(departure)}.` : 'Where would you like to stay?', value: venue.name },
     multiFloor && { id: 'floor', title: 'The floor', ask: nights ? 'Free rooms on each floor for your dates.' : 'Choose a floor of the house.', value: floor.name },
     { id: 'room', title: multiFloor ? 'The room' : 'The stay', ask: nights ? 'Rooms free for your dates — pick one and who is coming.' : 'Pick your room and who is coming.', value: `${room.name} · ${plural(guests, 'guest')}` },
@@ -189,16 +201,15 @@ export default function Reserve() {
   const current = open === 'floor' && !multiFloor ? 'room' : open;
   const at = steps.findIndex(s => s.id === current);
   const step = steps[at];
-  const isDone = s => touched.has(s.id) || (s.id === 'dates' && nights > 0);
 
   // What has to be settled before moving on from each step
   const blocker = {
-    dates: !nights && 'Choose your arrival and departure days.',
-    room: (left < rooms && `${room.name} is not free for all these nights — pick another room, floor or dates.`)
+    room: (!nights && 'Choose your arrival and departure days above.')
+      || (left < rooms && `${room.name} is not free for all these nights — pick another room, floor or dates.`)
       || (!fits && `${room.name} sleeps ${room.sleeps} — add a room for ${plural(guests, 'guest')}.`)
   }[current];
   const next = () => {
-    if (blocker) return setMessage(blocker);
+    if (blocker) { if (!nights) setDatesOpen(true); return setMessage(blocker); }
     if (at < steps.length - 1) go(current, steps[at + 1].id);
   };
   const prev = () => { if (at > 0) { setOpen(steps[at - 1].id); setMessage(''); } };
@@ -274,13 +285,6 @@ export default function Reserve() {
       </>
     );
 
-    if (id === 'dates') return (
-      <>
-        {avail?.error && <p className="rv-note">Live availability could not be loaded — you can still send a request and the desk will confirm.</p>}
-        <Calendar from={calendarFree ? from : todayIST()} free={calendarFree} need={1} arrival={arrival} departure={departure} onChange={chooseDates} />
-      </>
-    );
-
     return (
       <div className="rv-guest">
         <div className="rv-guest__fields">
@@ -313,7 +317,6 @@ export default function Reserve() {
     lastAt.current = at;
     if (reduceMotion || !dir) return;
     gsap.fromTo('.rv-pane', { opacity: 0, x: dir * 48 }, { opacity: 1, x: 0, duration: 0.8, ease: 'expo.out' });
-    gsap.fromTo('.rv-rail__fill', { scaleX: (at - dir) / (steps.length - 1) }, { scaleX: at / (steps.length - 1), duration: 0.9, ease: 'expo.inOut' });
   }, { scope: ref, dependencies: [at], revertOnUpdate: false });
 
   return (
@@ -354,22 +357,28 @@ export default function Reserve() {
 
         {/* The reservation, one step at a time */}
         <div className="rv__flow">
-          <ol className="rv-rail" style={{ '--steps': steps.length }}>
-            <span className="rv-rail__track" aria-hidden="true">
-              <span className="rv-rail__fill" style={{ transform: `scaleX(${at / (steps.length - 1)})` }} />
-            </span>
-            {steps.map((s, i) => {
-              const reachable = i <= at || isDone(s) || isDone(steps[i - 1] ?? s);
-              return (
-                <li key={s.id} className={[i === at && 'is-on', i < at && 'is-past', isDone(s) && 'is-done'].filter(Boolean).join(' ')}>
-                  <button type="button" onClick={() => { setOpen(s.id); setMessage(''); }} disabled={!reachable} aria-current={i === at ? 'step' : undefined}>
-                    <span className="rv-rail__dot" aria-hidden="true" />
-                    <span className="rv-rail__label">{s.title}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
+          {/* Dates first: a compact drop-down that stays at the top of every step */}
+          <div className={`rv-dates${datesOpen ? ' is-open' : ''}`} ref={datesRef}>
+            <button type="button" className="rv-dates__bar" onClick={() => setDatesOpen(o => !o)} aria-expanded={datesOpen}>
+              <span className="rv-dates__part">
+                <small>Arrival</small>
+                <b className={arrival ? undefined : 'is-empty'}>{arrival ? fmtLong(arrival) : 'Add date'}</b>
+              </span>
+              <i className="rv-dates__sep" aria-hidden="true">→</i>
+              <span className="rv-dates__part">
+                <small>Departure</small>
+                <b className={departure ? undefined : 'is-empty'}>{departure ? fmtLong(departure) : 'Add date'}</b>
+              </span>
+              <span className="rv-dates__nights">{nights ? plural(nights, nightWord) : 'Your dates'}</span>
+              <span className="rv-dates__chev" aria-hidden="true" />
+            </button>
+            {datesOpen && (
+              <div className="rv-dates__drop">
+                {avail?.error && <p className="rv-note">Live availability could not be loaded — you can still send a request and the desk will confirm.</p>}
+                <Calendar from={calendarFree ? from : todayIST()} free={calendarFree} need={1} arrival={arrival} departure={departure} onChange={chooseDates} />
+              </div>
+            )}
+          </div>
 
           <div className="rv-pane" key={current}>
             <header className="rv-pane__head">
