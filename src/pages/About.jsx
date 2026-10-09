@@ -3,8 +3,8 @@ import { gsap, useGSAP, reduceMotion } from '../motion';
 import Page from '../components/Page';
 import PageHeader from '../components/PageHeader';
 import Motif from '../components/Motif';
-import Experience from '../components/Experience';
 import Locations from '../components/Locations';
+import Lines from '../components/Lines';
 
 const PHOTO = '/assets/about-reception.webp';
 const PHOTO_SM = '/assets/about-reception-sm.webp';
@@ -41,34 +41,56 @@ function Backdrop() {
   );
 }
 
-function Story() {
+/* The group's history, in the client's own words: two chapters on a gold line, then the motto */
+const CHAPTERS = [
+  {
+    year: '1995',
+    place: 'Aarapalayam · Madurai',
+    text: <>Established in 1995 by <b>Mr. Sivaji</b> in Aarapalayam, Sivabhagya has grown into a prestigious group, building a legacy of excellence through its hotels, marriage halls, and hospitality ventures.</>,
+    by: 'Mr. Sivaji',
+    role: 'Founder, Sivabhagya'
+  },
+  {
+    year: '2021',
+    place: 'Kodaikanal',
+    text: <>Continuing this tradition, SKR Sivabhagya Adventure Resort, Kodaikanal, was established in 2021 by <b>Mr. Karthikeyan</b>, Founder and Managing Director (SKR Sivabhagya), bringing together luxury, nature, and adventure to create exceptional guest experiences.</>,
+    by: 'Mr. Karthikeyan',
+    role: 'Founder & Managing Director, SKR Sivabhagya'
+  }
+];
+
+function Legacy() {
   const ref = useRef(null);
 
   useGSAP(() => {
     if (reduceMotion) return;
-    gsap.from('.story__quote, .story__body p', {
-      opacity: 0, y: 40, duration: 1.4, stagger: 0.12, ease: 'expo.out',
-      scrollTrigger: { trigger: ref.current, start: 'top 80%' }
+    gsap.from('.legacy__entry, .legacy__motto', {
+      opacity: 0, y: 30, duration: 1.3, stagger: 0.14, ease: 'expo.out',
+      scrollTrigger: { trigger: ref.current, start: 'top 75%' }
     });
   }, { scope: ref });
 
   return (
-    <section className="story" ref={ref}>
-      <blockquote className="story__quote">
-        A guest should feel <em>expected</em> — never merely accommodated.
-      </blockquote>
-      <div className="story__body">
-        <p>
-          SKR Sivabhagya is a family of three stays in Tamil Nadu: an adventure resort in the hills of Kodaikanal,
-          a business class hotel in the heart of Madurai, and private service apartments in Kochadai.
-        </p>
-        <p>
-          Each has its own character — mountain air, temple-city bustle, the quiet of a home — but all three share one
-          standard: rooms kept immaculate, food served with care, and a team that looks after the small things so you
-          don't have to.
-        </p>
-        <p>
-          The crest you see on our walls is a promise in gold. We would like every stay to live up to it.
+    <section className="legacy" ref={ref}>
+      <div className="legacy__head">
+        <p className="eyebrow">Our Legacy</p>
+        <Lines lines={['A legacy of', <em>excellence.</em>]} />
+      </div>
+
+      <div className="legacy__body">
+        {CHAPTERS.map(c => (
+          <article className="legacy__entry" key={c.year}>
+            <p className="legacy__meta">
+              <span className="legacy__year">{c.year}</span>
+              <span className="legacy__place">{c.place}</span>
+            </p>
+            <p className="legacy__text">{c.text}</p>
+            <p className="legacy__by">{c.by} <span>· {c.role}</span></p>
+          </article>
+        ))}
+
+        <p className="legacy__motto">
+          Sivabhagya — <em>A Legacy of Excellence.</em> An Experience Beyond Ordinary.
         </p>
       </div>
     </section>
@@ -86,9 +108,8 @@ export default function About() {
           lines={[<>The House of <em>Sivabhagya.</em></>]}
           intro="Three addresses, one way of welcoming you — warm, attentive and unhurried."
         />
-        <Story />
+        <Legacy />
         <Motif />
-        <Experience />
         <Locations />
       </Page>
     </>

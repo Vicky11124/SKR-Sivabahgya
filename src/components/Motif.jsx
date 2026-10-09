@@ -15,6 +15,7 @@ export default function Motif() {
     // each path is normalised to length 1, so both reach the meeting point at the same moment
     gsap.to('path', {
       strokeDashoffset: 0,
+      autoRound: false, // GSAP rounds px values by default, which on a 0–1 dash snaps the line fully off or on
       ease: 'none',
       scrollTrigger: { trigger: ref.current, start: 'top 95%', end: 'center 50%', scrub: 0.6 }
     });

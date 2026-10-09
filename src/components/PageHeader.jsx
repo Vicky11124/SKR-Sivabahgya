@@ -7,8 +7,9 @@ import Lines from './Lines';
   Opening block for inner pages; plays once the page-change curtain has lifted.
   hero: fills the first screen and sits low and centred, for pages with a photo backdrop.
   tall: fills the first screen but keeps the usual layout, so the backdrop shows before the content below.
+  aside: optional element shown beside the text (stacked below it on small screens).
 */
-export default function PageHeader({ eyebrow, lines, intro, compact = false, hero = false, tall = false }) {
+export default function PageHeader({ eyebrow, lines, intro, aside, compact = false, hero = false, tall = false }) {
   const ref = useRef(null);
   const { transitioning } = useSite();
 
@@ -17,17 +18,28 @@ export default function PageHeader({ eyebrow, lines, intro, compact = false, her
     gsap.timeline({ delay: transitioning ? 1.05 : 0.3 })
       .from('.eyebrow', { opacity: 0, x: hero ? 0 : -20, y: hero ? 12 : 0, duration: 1.2, ease: 'expo.out' })
       .from('.line-mask > span', { yPercent: 110, duration: 1.5, stagger: 0.12, ease: 'expo.out' }, 0.05)
-      .from('.page-head__intro, .page-head__cue', { opacity: 0, y: 24, duration: 1.2, stagger: 0.15, ease: 'expo.out' }, 0.35);
+      .from('.page-head__intro, .page-head__cue', { opacity: 0, y: 24, duration: 1.2, stagger: 0.15, ease: 'expo.out' }, 0.35)
+      .from('.page-head__aside', { opacity: 0, x: 60, duration: 1.6, ease: 'expo.out' }, 0.2);
   }, { scope: ref });
 
-  const variant = hero ? ' page-head--hero' : compact ? ' page-head--compact' : tall ? ' page-head--tall' : '';
-
-  return (
-    <header className={`page-head${variant}`} ref={ref}>
+  const variant = (hero ? ' page-head--hero' : compact ? ' page-head--compact' : tall ? ' page-head--tall' : '') + (aside ? ' page-head--split' : '');
+  const text = (
+    <>
       <p className="eyebrow">{eyebrow}</p>
       <Lines as="h1" lines={lines} />
       {intro && <p className="page-head__intro">{intro}</p>}
       {hero && <span className="page-head__cue" aria-hidden="true"><i /></span>}
+    </>
+  );
+
+  return (
+    <header className={`page-head${variant}`} ref={ref}>
+      {aside ? (
+        <>
+          <div className="page-head__text">{text}</div>
+          <div className="page-head__aside">{aside}</div>
+        </>
+      ) : text}
     </header>
   );
 }

@@ -1,8 +1,11 @@
 import { useRef } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 
-/* A photo fixed behind the page (place pages and the Places overview); it darkens as you scroll so the sections stay readable */
-export default function Backdrop({ photo }) {
+/*
+  A photo fixed behind the page (place pages and the Places overview); it darkens as you scroll so the sections stay readable.
+  dim: show the photo at half strength.
+*/
+export default function Backdrop({ photo, dim = false }) {
   const ref = useRef(null);
 
   useGSAP(() => {
@@ -14,7 +17,7 @@ export default function Backdrop({ photo }) {
   }, { scope: ref });
 
   return (
-    <div className="backdrop backdrop--place" ref={ref} aria-hidden="true">
+    <div className={`backdrop backdrop--place${dim ? ' backdrop--dim' : ''}`} ref={ref} aria-hidden="true">
       <div className="backdrop__layer">
         <picture>
           <source media="(max-width: 700px)" srcSet={photo.small} />

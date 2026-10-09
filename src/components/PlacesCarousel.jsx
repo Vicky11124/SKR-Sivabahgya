@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { gsap, useGSAP, reduceMotion } from '../motion';
 import { venues } from '../data/venues';
 import { placePath } from '../data/pages';
@@ -6,7 +6,7 @@ import Lines from './Lines';
 import SiteLink from './SiteLink';
 
 /*
-  Home page only: one place at a time as a card in the middle, with the
+  Home page only (moves on by itself every 3.5 seconds): one place at a time as a card in the middle, with the
   neighbouring places as open panels on either side whose lines run out to the
   screen edges. The card's own photo fills the section behind, dimmed. Arrows, the side panels, the
   keyboard and a swipe all move it along; it wraps round at either end.
@@ -28,6 +28,22 @@ export default function PlacesCarousel() {
     setActive(index);
   };
   const move = step => show((active + step + n) % n, step);
+
+  // Moves on by itself every few seconds; any change (auto or by hand) restarts the wait.
+  // Holds while the pointer is over it, and while it is off screen or the tab is hidden.
+  const AUTOPLAY = 3500;
+  const [paused, setPaused] = useState(false);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { threshold: 0.3 });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (paused || !inView || leaving) return;
+    const t = setTimeout(() => { if (!document.hidden) move(1); }, AUTOPLAY);
+    return () => clearTimeout(t);
+  }, [active, paused, inView, leaving]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Section entrance: the card rises in, the side panels draw in from the edges
   useGSAP(() => {
@@ -108,6 +124,8 @@ export default function PlacesCarousel() {
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={() => { swipe.current = null; }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
       >
         <button type="button" className="pcar__side pcar__side--prev" onClick={() => move(-1)} aria-label={`Previous: ${prev.name}`}>
           <span className="pcar__arrow" aria-hidden="true" />
